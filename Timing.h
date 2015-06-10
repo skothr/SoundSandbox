@@ -9,16 +9,180 @@
 
 #include "Range.h"
 
-typedef int64_t s_time;	//Sample time, in number of samples
-typedef int32_t c_time;	//Chunk time, in number of chunks
-typedef double Time;	//Physical time, in seconds
+typedef int64_t s_time;		//Sample time, in number of samples
+typedef int32_t c_time;		//Chunk time, in number of chunks
+typedef double PhysTime;	//Physical time, in seconds
 
 //Range of time (seconds)
-typedef Range<Time> TimeRange;
+typedef Range<PhysTime> PhysTimeRange;
 //Range of sample time
 typedef Range<s_time> SampleRange;
 //Range of chunk time
 typedef Range<c_time> ChunkRange;
+
+//class Time;
+
+class Time
+{
+protected:
+	PhysTime t = 0.0;
+
+public:
+	Time() { }
+	Time(PhysTime time)
+		: t(time)
+	{ }
+	Time(const Time &other)
+		: t(other.t)
+	{ }
+
+	virtual bool isGlobal() const
+	{ return false; }
+	
+	//explicit operator Time() const;
+
+	operator PhysTime() const
+	{ return t; }
+
+	// +
+	Time& operator+=(const Time &rhs)
+	{ t += rhs.t;  return *this; }
+	//Time operator+(const Time& rhs) const
+	//{ return Time(*this) += rhs; }
+
+	Time& operator+=(double rhs)
+	{ t += rhs;  return *this; }
+	//Time operator+(double rhs) const
+	//{ return Time(*this) += rhs; }
+
+	// -
+	Time& operator-=(const Time &rhs)
+	{ t -= rhs.t;  return *this; }
+	//Time operator-(const Time& rhs) const
+	//{ return Time(*this) -= rhs; }
+
+	Time& operator-=(double rhs)
+	{ t -= rhs;  return *this; }
+	//Time operator-(double rhs) const
+	//{ return Time(*this) -= rhs; }
+	
+	// *
+	Time& operator*=(const Time &rhs)
+	{ t *= rhs.t;  return *this; }
+	//Time operator*(const Time& rhs) const
+	//{ return Time(*this) *= rhs; }
+	
+	Time& operator*=(double rhs)
+	{ t *= rhs;  return *this; }
+	//Time operator*(double rhs) const
+	//{ return Time(*this) *= rhs; }
+	
+	// /
+	Time& operator/=(const Time &rhs)
+	{ t /= rhs.t;  return *this; }
+	//Time operator/(const Time& rhs) const
+	//{ return Time(*this) /= rhs; }
+	
+	Time& operator/=(double rhs)
+	{ t /= rhs;  return *this; }
+	//Time operator/(double rhs) const
+	//{ return Time(*this) /= rhs; }
+};
+/*
+class Time : public Time
+{
+public:
+	Time() { }
+	Time(PhysTime time)
+		: Time(time)
+	{ }
+	Time(const Time &other)
+		: Time(other.t)
+	{ }
+	
+	explicit operator Time() const;
+
+	virtual bool isGlobal() const
+	{ return true; }
+	
+	operator PhysTime() const
+	{ return t; }
+	
+	// +
+	Time& operator+=(const Time &rhs)
+	{ t += rhs.t;  return *this; }
+	//Time operator+(const Time& rhs) const
+	//{ return Time(*this) += rhs; }
+
+	Time& operator+=(double rhs)
+	{ t += rhs;  return *this; }
+	//Time operator+(double rhs) const
+	//{ return Time(*this) += rhs; }
+
+	// -
+	Time& operator-=(const Time &rhs)
+	{ t -= rhs.t;  return *this; }
+	//Time operator-(const Time& rhs) const
+	//{ return Time(*this) -= rhs; }
+
+	Time& operator-=(double rhs)
+	{ t -= rhs;  return *this; }
+	//Time operator-(double rhs) const
+	//{ return Time(*this) -= rhs; }
+	
+	// *
+	Time& operator*=(const Time &rhs)
+	{ t *= rhs.t;  return *this; }
+	//Time operator*(const Time& rhs) const
+	//{ return Time(*this) *= rhs; }
+	
+	Time& operator*=(double rhs)
+	{ t *= rhs;  return *this; }
+	//Time operator*(double rhs) const
+	//{ return Time(*this) *= rhs; }
+	
+	// /
+	Time& operator/=(const Time &rhs)
+	{ t /= rhs.t;  return *this; }
+	//Time operator/(const Time& rhs) const
+	//{ return Time(*this) /= rhs; }
+	
+	Time& operator/=(double rhs)
+	{ t /= rhs;  return *this; }
+	//Time operator/(double rhs) const
+	//{ return Time(*this) /= rhs; }
+};
+*/
+
+typedef Range<Time> TimeRange;
+//typedef Range<Time> TimeRange;
+
+//typedef TimeClass<false> Time;
+//typedef TimeClass<true> Time;
+
+/*
+//Not global by default
+class Time
+{
+private:
+	bool global = false;
+	PhysTime t = 0.0;
+
+public:
+	Time();
+	Time(PhysTime time);
+	Time(PhysTime time, bool is_global);
+
+	~Time() = default;
+
+	bool isGlobal() const;
+	
+	Time& operator=(const Time &other);
+	Time& operator=(const PhysTime &time);
+
+	operator PhysTime() const;
+};
+*/
 
 
 enum class TimeUnits

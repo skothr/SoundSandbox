@@ -1,13 +1,13 @@
 /**********************************************************************/
 /*! \class RtMidi
-    \brief An abstract base class for realtime MIDI input/output.
+    \brief An abstract base class for Time MIDI input/output.
 
-    This class implements some common functionality for the realtime
+    This class implements some common functionality for the Time
     MIDI input/output subclasses RtMidiIn and RtMidiOut.
 
     RtMidi WWW site: http://music.mcgill.ca/~gary/rtmidi/
 
-    RtMidi: realtime MIDI i/o C++ classes
+    RtMidi: Time MIDI i/o C++ classes
     Copyright (c) 2003-2014 Gary P. Scavone
 
     Permission is hereby granted, free of charge, to any person
@@ -173,10 +173,10 @@ class RtMidi
 
 /**********************************************************************/
 /*! \class RtMidiIn
-    \brief A realtime MIDI input class.
+    \brief A Time MIDI input class.
 
     This class provides a common, platform-independent API for
-    realtime MIDI input.  It allows access to a single MIDI input
+    Time MIDI input.  It allows access to a single MIDI input
     port.  Incoming MIDI messages are either saved to a queue for
     retrieval using the getMessage() function or immediately passed to
     a user-specified callback function.  Create multiple instances of
@@ -331,7 +331,7 @@ class RtMidiIn : public RtMidi
 
 /**********************************************************************/
 /*! \class RtMidiOut
-    \brief A realtime MIDI output class.
+    \brief A Time MIDI output class.
 
     This class provides a common, platform-independent API for MIDI
     output.  It allows one to probe available MIDI output ports, to

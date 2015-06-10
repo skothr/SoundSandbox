@@ -32,11 +32,13 @@ const std::unordered_map<KeyCode, MidiIndex>	MidiDevice::vKeyIndexMapping {	{Key
 MidiDevice::MidiDevice()
 { }
 
+/*
 MidiDevice::MidiDevice(const MidiDevDesc &md_desc)
 {
 	///Init new MidiDevice///
 	init((md_desc.vDev ? -1 : getPort(md_desc.name)), nullptr);
 }
+*/
 
 MidiDevice::~MidiDevice()
 {
@@ -50,13 +52,27 @@ MidiDevice::~MidiDevice()
 		}
 	}
 
-	AU::safeDelete(midiIn);
+	if(midiIn)
+	{
+		//Close port
+		try
+		{
+			midiIn->closePort();
+		}
+		catch(RtMidiError &error)
+		{
+			std::cout << "Error closing MIDI device port!\n";
+		}
+
+		delete midiIn;
+	}
+	midiIn = nullptr;
 }
 
 
-AStatus MidiDevice::initDevices()
+bool MidiDevice::initDevices()
 {
-	AStatus status;
+	bool status = true;
 
 	if(!g_midiIn)
 	{
@@ -67,13 +83,29 @@ AStatus MidiDevice::initDevices()
 		}
 		catch(RtMidiError &error)
 		{
-			status.setError(AS::ErrorType::GENERAL, error.getMessage());
+			std::cout << "Error initializing global MIDI device!  -->  " << error.getMessage() << "\n";
+			status = false;
 		}
 	}
 	else
-		status.setWarning(AS::WType::ALREADY_INITIALIZED, "MidiDevice has already been initialized.");
+	{
+		std::cout << "MidiDevice has already been initialized.\n\n";
+		status = false;
+	}
 	
 	return status;
+}
+
+void MidiDevice::cleanupDevices()
+{
+	for(auto vd : virtualDevices)
+		if(vd)
+			delete vd;
+	virtualDevices.clear();
+
+	if(g_midiIn)
+		delete g_midiIn;
+	g_midiIn = nullptr;
 }
 
 unsigned int MidiDevice::numPorts()
@@ -81,9 +113,9 @@ unsigned int MidiDevice::numPorts()
 	return (g_midiIn ? g_midiIn->getPortCount() : 0u);
 }
 
-AStatus MidiDevice::printDevices()
+bool MidiDevice::printDevices()
 {
-	AStatus status;
+	bool status = true;
 
 	if(g_midiIn)
 	{
@@ -108,15 +140,17 @@ AStatus MidiDevice::printDevices()
 			}
 			catch(RtMidiError &error)
 			{
-				status.setError(AS::ErrorType::GENERAL, error.getMessage());
-				std::cout << "ERROR GETTING PORT NAME! (breaking)\n";
+				std::cout << "Error getting MIDI device port name!  -->  " << error.getMessage() << "\n";
+				status = false;
 				break;
 			}
 			std::cout << "\t" << i << ":\t" << port_name << "\n";
 		}
 	}
 	else
-		status.setError(AS::ErrorType::GENERAL, "MidiDevice has yet to be sucessfully initialized.");
+	{
+		std::cout << "Error printing devices: MidiDevice has yet to be sucessfully initialized!\n";
+	}
 
 	return status;
 }
@@ -141,9 +175,9 @@ int MidiDevice::getPort(std::string dev_name)
 	return -1;
 }
 
-AStatus MidiDevice::keyEvent(KeyCode key, EventType key_event)
+bool MidiDevice::keyEvent(KeyCode key, EventType key_event)
 {
-	AStatus status;
+	bool status = true;
 	
 	Time event_time = Clock::getGlobalTime();
 
@@ -204,15 +238,17 @@ AStatus MidiDevice::keyEvent(KeyCode key, EventType key_event)
 }
 
 
-AStatus MidiDevice::init(MidiPort p, MidiCallback callback_func)
+bool MidiDevice::init(MidiPort p, MidiCallback callback_func)
 {
-	AStatus status;
+	bool status = true;
 
 	//if(port == p)
 	//	status.setWarning(AS::WType::NO_ACTION_TAKEN, "The specified port was already loaded on this MidiDevice.");
 
 	//Unload existing connected midi device//
-	AU::safeDelete(midiIn);
+	if(midiIn)
+		delete midiIn;
+	midiIn = nullptr;
 
 	//Unload existing virtual device//
 	if(vDev)
@@ -243,8 +279,8 @@ AStatus MidiDevice::init(MidiPort p, MidiCallback callback_func)
 		}
 		catch(RtMidiError &error)
 		{
-			status.setError(AS::ErrorType::GENERAL, error.getMessage());
-			return status;
+			std::cout << "Error creating MIDI device  -->  " <<  error.getMessage() << "\n";
+			return false;
 		}
 
 		unsigned int n_ports = numPorts();
@@ -255,8 +291,8 @@ AStatus MidiDevice::init(MidiPort p, MidiCallback callback_func)
 		}
 		catch(RtMidiError &error)
 		{
-			status.setError(AS::ErrorType::GENERAL, error.getMessage());
-			return status;
+			std::cout << "Error getting MIDI device port name!  -->  " << error.getMessage() << "\n";
+			return false;
 		}
 
 		//Open port
@@ -266,8 +302,8 @@ AStatus MidiDevice::init(MidiPort p, MidiCallback callback_func)
 		}
 		catch(RtMidiError &error)
 		{
-			status.setError(AS::ErrorType::GENERAL, "Port failed to open.");
-			return status;
+			std::cout <<  "MIDI port failed to open!\n";
+			return false;
 		}
 
 		//Don't ignore sysex, timing, or active sensing messages
@@ -277,8 +313,8 @@ AStatus MidiDevice::init(MidiPort p, MidiCallback callback_func)
 		}
 		catch(RtMidiError &error)
 		{
-			status.setError(AS::ErrorType::GENERAL, "Setting ignore types failed.");
-			return status;
+			std::cout <<  "Setting MIDI device ignore types failed!\n";
+			return false;
 		}
 
 		//Set callback function
@@ -288,8 +324,8 @@ AStatus MidiDevice::init(MidiPort p, MidiCallback callback_func)
 		}
 		catch(RtMidiError &error)
 		{
-			status.setError(AS::ErrorType::GENERAL, "Setting midi callback failed.");
-			return status;
+			std::cout <<  "Setting MIDI callback failed!\n";
+			return false;
 		}
 	}
 
@@ -332,10 +368,10 @@ void MidiDevice::midiCallback(double time_stamp, std::vector<unsigned char> *mes
 	if(p_dev)
 	{
 		//Update time
-		Time	g_time = Clock::getGlobalTime();
+		Time	g_time = HRes_Clock::getGlobalTime();
 		//Add time_stamp (dt) to eventTime, and make sure it isnt ahead of g_time
 		//p_dev->eventTime = (p_dev->eventTime < 0.0 ? g_time : min(g_time, p_dev->eventTime + time_stamp));
-		p_dev->eventTime = (p_dev->eventTime < 0.0 ? g_time : p_dev->eventTime + time_stamp);
+		p_dev->eventTime = g_time;//(p_dev->eventTime < 0.0 ? g_time : p_dev->eventTime + time_stamp);
 		Time	diff = p_dev->eventTime - g_time;
 		
 		if(abs(diff) > chunk_time)
@@ -350,9 +386,9 @@ void MidiDevice::midiCallback(double time_stamp, std::vector<unsigned char> *mes
 			//Pass event to the appropriate device
 			if(p_dev->callback)
 			{
-				AStatus status = p_dev->callback(e);
-				if(!statusSucceeded(status))
-					std::cout << status << "\n";
+				bool status = p_dev->callback(e);
+				if(!status)
+					std::cout << "MIDI CALLBACK FAILED.\n";
 			}
 
 			//Update device states
@@ -377,6 +413,7 @@ const MidiDeviceState* MidiDevice::getState() const
 	return &state;
 }
 
+/*
 void MidiDevice::updateDesc()
 {
 	objDesc = (objDesc ? objDesc : (ObjDesc*)(new MidiDevDesc()));
@@ -386,3 +423,4 @@ void MidiDevice::updateDesc()
 	desc->name = name;
 	desc->octaveOffset = octaveOffset;
 }
+*/

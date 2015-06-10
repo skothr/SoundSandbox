@@ -2,6 +2,7 @@
 #define APOLLO_NODE_GRAPH_CONTROL_H
 
 #include "NodeElementContainer.h"
+#include "NodeResources.h"
 
 #include <vector>
 
@@ -25,12 +26,10 @@ protected:
 	NodeGraph			*nodeGraph = nullptr;
 	PropertiesDisplay	*propDisp = nullptr;
 
-	std::unordered_set<NodeConnectionControl*>	connections;
-	std::unordered_map<Node*, NodeControl*>		nodeControls;	//Set of Nodes that are set up
+	std::unordered_map<CID, std::unique_ptr<NodeConnectionControl>>	connectionControls;
+	std::unordered_map<NID, std::unique_ptr<NodeControl>>			nodeControls;
 
-	NodeConnectionControl						*movingConnection = nullptr;
-
-	void updateGraph();
+	NodeConnectionControl											*movingConnection = nullptr;
 
 	virtual void onSizeChanged(AVec d_size) override;
 
@@ -50,17 +49,28 @@ public:
 								GRAPH_MAX;
 	static const AVec			UNIT_SIZE,
 								ZOOM_STEP;
+	
+	void updateGraph();
+	
+	//Returns the new pointer to the connection
+	NodeConnectionControl* addConnection(NodeConnectionControl *ncc);
+	void removeConnection(NodeConnectionControl *ncc);
 
 	void setPropDisplay(PropertiesDisplay *prop_disp);
 	void setGraph(NodeGraph *node_graph);
 
-	void startConnect(NodeControl *nc, NCID nc_id);
+	//void startDisconnect(NodeControl *nc, NCID nc_id);
+	//void startDisconnect(NodeConnectorControl *ncc);
+
+	void startConnect(NCID nc_id);
 	void startConnect(NodeConnectorControl *ncc);
 
-	void finishConnect(NodeControl *nc, NCID nc_id);
+	void finishConnect(NCID nc_id);
 	void finishConnect(NodeConnectorControl *ncc);
 
-	NodeControl* getNodeControl(Node *node);
+	NodeConnectionControl* getMovingConnection();
+
+	NodeControl& getNodeControl(NID id);
 
 	friend class NodeConnectionControl;
 	friend class NodeControl;

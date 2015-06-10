@@ -1,6 +1,7 @@
 #ifndef APOLLO_GRAPH_DATA_H
 #define APOLLO_GRAPH_DATA_H
 
+#include "Timing.h"
 #include "Range.h"
 #include "Screen.h"
 #include <vector>
@@ -30,7 +31,7 @@ struct GraphData
 	//virtual YDataType getData(XDataType index) const = 0;
 	//virtual void getData(Range<XDataType> range, YDataType *data_out) const = 0;
 
-	virtual void update(double dt) = 0;
+	virtual void update(const Time &dt) = 0;
 
 	virtual void getData(FRange x_range, float x_step, std::vector<GPoint> &out_data) const = 0;
 	//virtual void drawData(Range<XDataType> x_range, GlInterface &gl) const = 0;

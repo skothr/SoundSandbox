@@ -99,7 +99,7 @@ public:
 	void setFgStateColor(Color col, ControlState state);
 	void setAllFgStateColors(Color col);
 
-	virtual void update(double dt) override;
+	virtual void update(const Time &dt) override;
 
 	friend class GuiGroup;
 };

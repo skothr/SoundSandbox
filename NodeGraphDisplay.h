@@ -110,7 +110,7 @@ public:
 
 	virtual bool respondToClick(APoint m_pos, MouseButton b) override;
 	
-	virtual void update(double dt) override;
+	virtual void update(const Time &dt) override;
 
 	void drawGraph(GlInterface &gl);
 	virtual void draw(GlInterface &gl) override;
@@ -158,7 +158,7 @@ public:
 	APoint getConnectorPoint(NCType io_type);
 	NodeConnector* getDefaultConnector();
 
-	virtual void update(double dt) override;
+	virtual void update(const Time &dt) override;
 
 	void drawBody(GlInterface &gl);
 	virtual void draw(GlInterface &gl) override;
@@ -261,7 +261,7 @@ public:
 	virtual bool respondToMouse(APoint m_pos) override;
 	virtual bool respondToClick(APoint m_pos, MouseButton b) override;
 
-	virtual void update(double dt) override;
+	virtual void update(const Time &dt) override;
 	virtual void draw(GlInterface &gl) override;
 };
 

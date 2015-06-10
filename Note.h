@@ -3,6 +3,8 @@
 
 #include "MIDI.h"
 
+class MidiData;
+
 //Represents a note value on the piano (e.g. C4 = middle C, G4s = A4f = G4-sharp = A4=flat)
 //	The value of each Note is the corresponding MidiIndex
 enum class NoteValue : MidiIndex

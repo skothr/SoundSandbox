@@ -1,17 +1,17 @@
 #ifndef APOLLO_CHECKBOX_H
 #define APOLLO_CHECKBOX_H
 
-#include "Control.h"
+#include "CompoundControl.h"
 #include "Label.h"
 #include "Callbacks.h"
 
-class Checkbox : public Control
+class Checkbox : public CompoundControl
 {
 protected:
-	Label label;
-	bool value;		//Off or on
+	Label			label;
+	bool			value = false;		//Off or on
 
-	voidCallback onValueChanged = nullptr;
+	voidCallback	onValueChanged = nullptr;
 
 	virtual void onMouseUp(APoint m_pos, MouseButton b, bool direct) override;
 

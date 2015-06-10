@@ -1,5 +1,6 @@
 #include "Note.h"
 
+#include "MidiData.h"
 
 MidiIndex getIndex(const NoteValue &n)
 {

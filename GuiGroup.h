@@ -55,7 +55,7 @@ public:
 
 	void updateResources() const;
 
-	void update(double dt) const;
+	void update(const Time &dt) const;
 	void draw(GlInterface &gl) const;
 
 };

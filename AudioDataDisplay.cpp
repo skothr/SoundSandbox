@@ -15,7 +15,7 @@ AudioGraphData::AudioGraphData(const AudioData *audio_data, bool flip_chunks, bo
 AudioGraphData::~AudioGraphData()
 { }
 
-void AudioGraphData::update(double dt)
+void AudioGraphData::update(const Time &dt)
 {
 
 }
@@ -292,9 +292,18 @@ void AudioDataDisplay::drawGraph(GlInterface &gl)
 
 		ChunkRange c_r((c_time)floor(v_origin.x/(float)chunk_size), (c_time)ceil((v_origin.x + v_size.x)/(float)chunk_size));
 
+		const AudioData		*a_data = audioData.aData;
+		const AudioVelData	*av_data = dynamic_cast<const AudioVelData*>(a_data);
+		const AudioAmpData	*aa_data = dynamic_cast<const AudioAmpData*>(a_data);
+
+		bool vel = (av_data != nullptr && aa_data == nullptr);
+
 		for(c_time c = c_r.start; c < c_r.end; c++)
 		{
-			if(audioData.aData->getChunkStatus(c) == DataStatus::CLEAN)
+			const AudioChunk *this_chunk = vel ? dynamic_cast<const AudioChunk*>((*av_data)[c])
+												: dynamic_cast<const AudioChunk*>((*aa_data)[c]);
+
+			if(this_chunk->getStatus() == DataStatus::CLEAN)
 				gl.setColor(Color(0.0f, 1.0f, 0.0f, 0.2f));
 			else
 				gl.setColor(Color(1.0f, 0.0f, 0.0f, 0.2f));

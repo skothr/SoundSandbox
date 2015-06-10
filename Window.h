@@ -10,15 +10,17 @@
 #include "WindowWin32.h"
 #include "GlInterface.h"
 
+
 class Window : public Container
 {
-private:
-	bool	inFocus;
+protected:
+	std::vector<Window*> childWindows;
 
 	std::string title;
 	WindowWin32 *windowImpl = nullptr;
 
-	GlInterface gl;
+	//Used for all windows
+	static GlInterface gl;
 	
 	bool		keyStates[static_cast<unsigned int>(Keys::K_COUNT)];
 
@@ -28,21 +30,33 @@ private:
 	//virtual void onPosChanged(AVec d_pos) override;
 	//virtual void onSizeChanged(AVec d_size) override;
 
+	virtual void onShow() override;
+	virtual void onHide() override;
+
+
+
 public:
 	Window(std::string label, APoint a_pos, AVec a_size, GuiStateFlags s_flags);
+	Window(APoint a_pos, AVec a_size, GuiStateFlags s_flags);
 	virtual ~Window();
 
 	static const GuiPropFlags PROP_FLAGS;
+
+	static void loadResources();
 
 	void setPos(int x, int y);
 	void setPos(APoint a_pos);
 	void setSize(int w, int h);
 	void setSize(AVec a_size);
 
-	void setFocus(bool in_focus);
+	APoint getClientPos();
+
+	virtual void setFocus(bool in_focus);
 
 	bool isOpen();
 	void close();
+
+	void addChildWindow(Window *child_window);
 
 	void handleEvent(const Event &e);
 	void handleWindow();
@@ -50,9 +64,15 @@ public:
 
 	WindowWin32* getWindowImpl() { return windowImpl; }
 
-	virtual void update(double dt) override;
+	virtual void update(const Time &dt) override;
+
+	virtual void draw();
 	virtual void draw(GlInterface &gl) override;
-	void draw();
+
+	//Resets gl and clearcolor for after another window has been set active
+	void resetView();
+
+	friend class ContextWindow;
 };
 
 

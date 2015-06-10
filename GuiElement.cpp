@@ -2,6 +2,7 @@
 
 #include "ParentElement.h"
 #include "TransformContainer.h"
+#include "Window.h"
 
 GuiElement::GuiElement()
 	: parent(nullptr), pos(), size(), visible(false),
@@ -17,21 +18,28 @@ GuiElement::GuiElement(ParentElement *parent_, APoint a_pos, AVec a_size, GuiPro
 {
 	setDefaultBg();
 
+	Window *this_window = dynamic_cast<Window*>(this);
+
 	//Add this element to parent's children
 	if(parent)
-		parent->addChild(this, flags.isFloating());
-
+	{
+		if(this_window)
+		{
+			parent->getTopWindow()->addChildWindow(this_window);
+		}
+		else
+			parent->addChild(this, flags.isFloating());
+	}
 }
 
 GuiElement::~GuiElement()
 {
-	for(auto a : attachments)
-		a.element->detach(this);
+	//for(auto a : attachments)
+	//	a.element->detach(this);
+	//detachAll();
 
 	for(int side = 0; side < Side::COUNT; side++)
 		detach((AttachSide)side);
-
-	attachments.clear();
 }
 
 
@@ -148,7 +156,6 @@ bool GuiElement::detach(AttachSide side)
 	if(isAttached(side))
 	{
 		getAttached(side)->detach(this);
-		//attachedTo[side] = nullptr;
 		return true;
 	}
 	else
@@ -173,6 +180,15 @@ bool GuiElement::detach(GuiElement *e)
 	}
 
 	return false;
+}
+
+void GuiElement::detachAll()
+{
+	//TODO: Need to detach???
+	//for(auto a : attachments)
+	//	if(a.element)
+	//		a.element->attachedTo[a.side] = nullptr;
+	attachments.clear();
 }
 
 GuiElement* GuiElement::getAttached(AttachSide side)
@@ -210,6 +226,13 @@ void GuiElement::drawBackground(GlInterface &gl)
 void GuiElement::setDefaultBg()
 {
 	bgColor = Color(0.15f, 0.15f, 0.15f, 1.0f);
+}
+
+Window* GuiElement::getTopWindow()
+{
+	Window *this_window = dynamic_cast<Window*>(this);
+	
+	return this_window ? this_window : parent->getTopWindow();
 }
 
 void GuiElement::setParent(ParentElement *new_parent, bool was_floating, bool now_floating, bool handle)

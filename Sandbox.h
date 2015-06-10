@@ -7,6 +7,7 @@
 #include "MenuBar.h"
 
 #include "Cursor.h"
+#include "ContextTree.h"
 
 enum class SandboxLayout
 {
@@ -23,6 +24,7 @@ class ProjectTrackDisplay;
 class PropertiesDisplay;
 class ScrollArea;
 class SpeakerNode;
+class DynamicAudioBufferNode;
 class TimeMapNode;
 
 class ImageButton;
@@ -34,15 +36,20 @@ struct Sandbox// : public Saveable
 	NodeGraph	graph;
 	int			sampleRate = 0;
 
+	//TEMP
+	Cursor		*mainCursor = nullptr;
+
 	Sandbox(int sample_rate);
 	Sandbox(const Sandbox &other);
-	Sandbox(const ObjDesc &obj_desc);
+	//Sandbox(const ObjDesc &obj_desc);
 	~Sandbox() = default;
 
 	Sandbox& operator=(const Sandbox &other);
 
-	void update(Time dt);
+	void update(const Time &dt);
 	void createNode(NodeType t, SandboxWindow *window);
+
+	void stopAllDevices();
 	
 //protected:
 //	virtual void updateDesc() override;
@@ -51,30 +58,32 @@ struct Sandbox// : public Saveable
 class SandboxWindow : public Window
 {
 private:
-	Sandbox				*sb = nullptr;
+	Sandbox					*sb = nullptr;
 
-	MenuBar				*menu = nullptr;
+	MenuBar					*menu = nullptr;
 
-	Area				*mainArea = nullptr;
-	NodeGraphControl	*graphDisp = nullptr;
-	ProjectTrackDisplay	*trackDisp = nullptr;
-	PropertiesDisplay	*propDisp = nullptr;
+	Area					*mainArea = nullptr;
+	NodeGraphControl		*graphDisp = nullptr;
+	ProjectTrackDisplay		*trackDisp = nullptr;
+	PropertiesDisplay		*propDisp = nullptr;
 	
-	ImageButton			*playPause = nullptr,
-						*reset = nullptr;
+	ImageButton				*playPause = nullptr,
+							*reset = nullptr;
 
-	SpeakerNode			*stream = nullptr;
+	SpeakerNode				*stream = nullptr;
+	DynamicAudioBufferNode	*mainTrack = nullptr;
+	Cursor					*pMainCursor = nullptr;
 
-	Cursor				cursor;
+	//Cursor				cursor;
 	
-	MenuTree			menuTree;
+	ContextTree			menuTree;
 	void initMenu();
 
 public:
 	static const int MENU_BAR_WIDTH = 25;
 
 	SandboxWindow(Point2i pos, Vec2i size, int sample_rate, GuiStateFlags s_flags);
-	~SandboxWindow();
+	virtual ~SandboxWindow();
 	
 	//static void loadResources();
 
@@ -87,11 +96,11 @@ public:
 	Sandbox* getSandbox();
 	void setSandbox(const Sandbox &new_sb);
 
-	virtual void update(Time dt) override;
+	virtual void update(const Time &dt) override;
 	virtual void draw(GlInterface &gl) override;
 	void draw();
 
-	friend class Sandbox;
+	friend struct Sandbox;
 };
 
 #endif	//APOLLO_SANDBOX_H

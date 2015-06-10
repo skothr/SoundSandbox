@@ -16,7 +16,7 @@ public:
 
 	static const GuiPropFlags PROP_FLAGS;
 
-	virtual void update(double dt) override;
+	virtual void update(const Time &dt) override;
 	virtual void draw(GlInterface &gl) override;
 };
 

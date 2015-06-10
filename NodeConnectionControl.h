@@ -12,7 +12,7 @@ class NodeConnectionControl : public Control
 {
 protected:
 	NodeGraphControl	*ngc_parent = nullptr;
-	COwnedPtr			NC;
+	NodeConnection		*NC;
 	
 	NodeControl			*fromNodeControl = nullptr,	//No arrow side
 						*toNodeControl = nullptr;	//Arrow side
@@ -32,6 +32,9 @@ protected:
 	double				f_trans_time = 0.0,
 						b_trans_time = 0.0;
 
+	bool				pushing = false,
+						pulling = false;
+
 	Color				connectionColor;
 
 	virtual void onDrag(APoint m_pos, AVec d_pos, bool direct) override;
@@ -43,7 +46,7 @@ protected:
 	float distanceToLine(APoint p);	//Returns the distance of the given point from the main connection line
 
 public:
-	NodeConnectionControl(NodeGraphControl *parent_, GuiStateFlags s_flags, COwnedPtr nc);
+	NodeConnectionControl(NodeGraphControl *parent_, GuiStateFlags s_flags, NodeConnection *nc);
 	virtual ~NodeConnectionControl();
 
 	static const GuiPropFlags PROP_FLAGS;
@@ -66,13 +69,16 @@ public:
 
 	void setHangingPos(APoint h_pos);
 
+	NodeConnector* getHangingNode();
+
 	bool fromConnected() const;
 	bool toConnected() const;
 
-	virtual void update(double dt) override;
+	virtual void update(const Time &dt) override;
 	virtual void draw(GlInterface &gl) override;
 
 	friend class NodeGraphControl;
+	friend class NodeConnectorControl;
 };
 
 #endif	//APOLLO_NODE_CONNECTION_CONTROL_H

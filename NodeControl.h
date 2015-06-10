@@ -1,15 +1,15 @@
 #ifndef APOLLO_NODE_CONTROL_H
 #define APOLLO_NODE_CONTROL_H
 
-#include "NodeElement.h"
 #include "Node.h"
 #include "Control.h"
+#include "NodeElement.h"
+#include "Label.h"
 
 #include <vector>
 
 enum class MouseButton;
 
-class Label;
 class Node;
 class NodeConnector;
 class NodeConnectionControl;
@@ -32,7 +32,7 @@ class NodeControl : public NodeElement
 protected:
 	NodeGraphControl *ngc_parent = nullptr;
 	Node *node;
-	Label *name;
+	Label nameLabel;
 
 	std::vector<NodeConnectorControl*> connectorControls;
 	
@@ -41,6 +41,11 @@ protected:
 
 	virtual void onMouseUp(APoint m_pos, MouseButton b, bool direct) override;
 	virtual void onMouseDown(APoint m_pos, MouseButton b, bool direct) override;
+
+	virtual void onDrag(APoint m_pos, AVec d_pos, bool direct) override;
+
+
+	virtual void onPosChanged(AVec d_pos) override;
 
 
 public:
@@ -80,7 +85,7 @@ protected:
 	//virtual void onMouseMove(APoint m_pos, AVec d_pos, bool direct) override;
 	virtual void onMouseDown(APoint m_pos, MouseButton b, bool direct) override;
 	virtual void onMouseUp(APoint m_pos, MouseButton b, bool direct) override;
-	//virtual void onDrag(APoint m_pos, AVec d_pos, bool direct) override;
+	virtual void onDrag(APoint m_pos, AVec d_pos, bool direct) override;
 
 public:
 	NodeConnectorControl(NodeControl *parent_, GuiStateFlags s_flags, NCID nc_id);

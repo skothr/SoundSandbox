@@ -2,37 +2,44 @@
 
 #include <iostream>
 
+#include "Shaders.h"
+
+
+/////GL CONTEXT/////
+//ShaderProgram *GlContext::textSP = nullptr;
+//GLuint GlContext::text_vbID = 0;
+
 int GlContext::activeIndex = -1;
 std::vector<GlContext*> GlContext::contexts;
 
 GlContext::GlContext()
 {
-	contexts.push_back(this);
-	thisIndex = contexts.size() - 1;
+	//contexts.push_back(this);
+	//thisIndex = contexts.size() - 1;
 }
 
 GlContext::~GlContext()
 {
-	if(activeIndex == thisIndex)
-	{
-		activeIndex = -1;
+	//if(activeIndex == thisIndex)
+	//{
+	//	activeIndex = -1;
 		wglMakeCurrent(nullptr, nullptr);
-	}
+	//}
 
-	for(unsigned int i = thisIndex + 1; i < contexts.size(); i++)
-	{
-		if(contexts[i]->isActive())
-			activeIndex--;
-		contexts[i]->thisIndex--;
-	}
+	//for(unsigned int i = thisIndex + 1; i < contexts.size(); i++)
+	//{
+	//	if(contexts[i]->isActive())
+	//		activeIndex--;
+	//	contexts[i]->thisIndex--;
+	//}
 
-	contexts.erase(contexts.begin() + thisIndex);
+	//contexts.erase(contexts.begin() + thisIndex);
 
 	wglDeleteContext(m_hGLRC);
 	ReleaseDC(m_hWnd, m_hDC);
 }
 
-void GlContext::setUpPixelFormat()
+void GlContext::setUpPixelFormat(HDC dc)
 {
 	PIXELFORMATDESCRIPTOR pfd = {
 		sizeof(PIXELFORMATDESCRIPTOR),
@@ -53,18 +60,20 @@ void GlContext::setUpPixelFormat()
 		0, 0, 0
 	};
 
-	int pixelFormat = ChoosePixelFormat(m_hDC, &pfd);
+	int pixelFormat = ChoosePixelFormat(dc, &pfd);
 	if(!pixelFormat)
 	{
-		MessageBox(WindowFromDC(m_hDC), L"ChoosePixelFormat has failed.", L"Error", MB_ICONERROR | MB_OK);
+		MessageBox(WindowFromDC(dc), L"ChoosePixelFormat has failed.", L"Error", MB_ICONERROR | MB_OK);
 		exit(1);
 	}
 
-	if(SetPixelFormat(m_hDC, pixelFormat, &pfd) != TRUE)
+	if(SetPixelFormat(dc, pixelFormat, &pfd) != TRUE)
 	{
-		MessageBox(WindowFromDC(m_hDC), L"SetPixelFormat has failed.", L"Error", MB_ICONERROR | MB_OK);
+		MessageBox(WindowFromDC(dc), L"SetPixelFormat has failed.", L"Error", MB_ICONERROR | MB_OK);
 		exit(1);
 	}
+
+	std::cout << "---" << pixelFormat << "\n";
 
 }
 
@@ -114,7 +123,7 @@ void GlContext::init(HWND hwnd)
 {
 	m_hWnd = hwnd;
 	m_hDC = GetDC(m_hWnd);
-	setUpPixelFormat();
+	setUpPixelFormat(m_hDC);
 	setUpPalette();
 
 	/*
@@ -125,7 +134,7 @@ void GlContext::init(HWND hwnd)
 	
 	m_hGLRC = wglCreateContext(m_hDC);
 
-	setActive();
+	setActive(m_hDC);
 	
 	GLint major, minor;
 
@@ -137,13 +146,17 @@ void GlContext::init(HWND hwnd)
 	GLenum err = glewInit();
 	if(err != GLEW_OK)
 		std::cout << glewGetErrorString(err) << "\n";
+
+	//if(!textSP)
+	//{
+	//	loadResources();
+	//}
 	
 	//TODO: Set up matrices
 
 	//
 	//glMatrixMode(GL_PROJECTION);
 	//glOrtho(-1.0f, 1.0f, -1.0f, 1.0f, -5.0f, 5.0f);
-
 }
 /*
 void GlContext::setActiveContext(GlContext *c)
@@ -154,23 +167,34 @@ void GlContext::setActiveContext(GlContext *c)
 		wglMakeCurrent(nullptr, nullptr);
 }
 */
-void GlContext::setActive()
+void GlContext::setActive(HDC window)
 {
-	if(activeIndex != thisIndex)
-	{
-		if(!wglMakeCurrent(m_hDC, m_hGLRC))
-			std::cout << "Failed to make context active!\n";
-		else
-			activeIndex = thisIndex;
-	}
+	//if(activeIndex != thisIndex)
+	//{
+		HDC curr_dc = wglGetCurrentDC();
+
+		if(curr_dc != window)
+		{
+			//wglMakeCurrent(nullptr, nullptr);
+
+			if(!wglMakeCurrent(window, m_hGLRC))
+			{
+				std::cout << "Failed to make context active! --> " << GetLastError() << "\n";
+			}
+		}
+	//	else
+	//		activeIndex = thisIndex;
+	//}
 }
 
-void GlContext::swapBuffers()
+void GlContext::swapBuffers(HDC window)
 {
-	SwapBuffers(m_hDC);
+	SwapBuffers(window);
 }
 
-bool GlContext::isActive()
+bool GlContext::isActive(HDC window)
 {
-	return thisIndex == activeIndex;
+	HDC curr_dc = wglGetCurrentDC();
+
+	return (curr_dc == window);//thisIndex == activeIndex;
 }

@@ -1,19 +1,21 @@
 #include "Label.h"
-
+#include "ParentElement.h"
 
 /////LABEL/////
 Font Label::font;
 const GuiPropFlags Label::PROP_FLAGS = PFlags::NONE;
 
 Label::Label(ParentElement *parent_, APoint a_pos, GuiStateFlags s_flags, const std::string &text_, int font_height)
-	: GuiElement(parent_, a_pos, AVec(), GuiProps(s_flags, PROP_FLAGS)),
+	: GuiElement(parent_, a_pos, AVec(0.0f, font_height), GuiProps(s_flags, PROP_FLAGS)),
 		text(text_), textObj(text, &font, font_height)
 {
 	updateText();
 }
 
 Label::~Label()
-{ }
+{
+
+}
 
 void Label::initResources()
 {

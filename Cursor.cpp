@@ -8,13 +8,18 @@ Cursor::Cursor(int sample_rate, s_time chunk_size, c_time chunk_step)
 	: sampleRate(sample_rate), chunkSize(chunk_size), chunkStep(chunk_step),
 		sampleRateInv(1.0/(double)sample_rate), chunkSizeInv(1.0/(double)chunk_size),
 		sampleRange(0, chunk_size*chunk_step), chunkRange(0, chunk_step), timeRange(0.0, 0.0)
+		//globalTimeRange(0.0, 0.0)
 {
-	timeRange.end = sampleRateInv;
+	timeRange.end = sampleRateInv*chunkSize;
+	//globalTimeRange.start = HRes_Clock::getGlobalTime();
+	//globalTimeRange.end = globalTimeRange.start + sampleRateInv*chunkSize;
 }
 
+/*
 Cursor::Cursor(const CursorDesc &c_desc)
 	: Cursor(c_desc.sampleRate, c_desc.chunkSize, c_desc.chunkStep)
 { }
+*/
 
 void Cursor::update(s_time new_sample_start)
 {
@@ -30,9 +35,24 @@ void Cursor::update(s_time new_sample_start)
 
 void Cursor::step()
 {
-	update(sampleRange.start + chunkSize*chunkStep);
-}
+	//if(active && !just_activated)
+	//{
+		update(sampleRange.start + chunkSize*chunkStep);
+	//}
+	//if(!just_activated)
+	//	stepGlobal();
 
+	//just_activated = false;
+	
+}
+/*
+void Cursor::stepGlobal()
+{
+	//globalTimeRange.start = globalTimeRange.end;		//The beginning global time of this chunk
+	globalTimeRange.end = HRes_Clock::getGlobalTime();	//The ending global time of this chunk
+	globalTimeRange.start = globalTimeRange.end - sampleRateInv*chunkSize;
+}
+*/
 void Cursor::setSampleRate(int new_sample_rate)
 {
 	//TODO: Adjust sample start time to compensate for new sample rate?
@@ -111,7 +131,47 @@ TimeRange Cursor::getTimeRange() const
 {
 	return timeRange;
 }
+/*
+TimeRange Cursor::getGlobalTimeRange() const
+{
+	return globalTimeRange;
+}
 
+Time Cursor::convertToLocal(Time global_t) const
+{
+	return global_t + (timeRange.start - globalTimeRange.start);
+}
+
+Time Cursor::convertToGlobal(Time local_t) const
+{
+	return local_t + (globalTimeRange.start - timeRange.start);
+}
+
+TimeRange Cursor::convertToLocal(TimeRange global_range) const
+{
+	return TimeRange(convertToLocal(global_range.start), convertToLocal(global_range.end));
+}
+
+TimeRange Cursor::convertToGlobal(TimeRange local_range) const
+{
+	return TimeRange(convertToGlobal(local_range.start), convertToGlobal(local_range.end));
+}
+*/
+void Cursor::setActive(bool is_active)
+{
+	//bool changed = (active != is_active);
+	active = is_active;
+
+	//just_activated = changed && active;
+
+}
+
+bool Cursor::isActive() const
+{
+	return active;
+}
+
+/*
 void Cursor::updateDesc()
 {
 	objDesc = (objDesc ? objDesc : (ObjDesc*)(new CursorDesc()));
@@ -123,3 +183,4 @@ void Cursor::updateDesc()
 	desc->chunkStep = chunkStep;
 }
 
+*/

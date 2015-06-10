@@ -4,6 +4,8 @@
 #include <GL/glew.h>
 #include "Screen.h"
 
+#include "GlContext.h"
+
 #include FT_GLYPH_H
 
 //////FONT CLASS
@@ -147,21 +149,24 @@ FT_GlyphSlot Font::getCharacter(char c)
 
 
 
-/////TEXT CLASS
-ShaderProgram *Text::textSP;
-GLuint Text::vbID = 0;
+/////TEXT CLASS/////
+ShaderProgram	*Text::textSP = nullptr;
+GLuint			Text::vbID = 0;
 
+/*
 Text::Text()
-	: font(NULL), charHeight(0.0f), text(""), tex(), origin_y(0.0f)
+{
+	update();
+}
+*/
+Text::Text(std::string str, Font *f, float height)
+	: font(f), charHeight(height), text(str), origin_y(0.0f)
 {
 	update();
 }
 
-Text::Text(std::string str, Font *f, float height)
-	: font(f), charHeight(height), text(str), tex(), origin_y(0.0f)
-{
-	update();
-}
+Text::~Text()
+{ }
 
 void Text::loadResources()
 {
@@ -222,7 +227,7 @@ void Text::update()
 		origin_y = strDims.z;
 
 		tex.create(strSize);
-		glClearColor(0.2, 0.2, 0.2, 0);
+		glClearColor(0.0, 0.0, 0.0, 0);
 		tex.setActive(true);
 		textSP->setActive();
 		
@@ -285,9 +290,12 @@ void Text::setFont(Font *f)
 
 void Text::setCharacterSize(float height)
 {
-	charHeight = height;
-	font->setCharacterSize(charHeight);
-	update();
+	if(font)
+	{
+		charHeight = height;
+		font->setCharacterSize(charHeight);
+		update();
+	}
 }
 
 void Text::setString(std::string str)

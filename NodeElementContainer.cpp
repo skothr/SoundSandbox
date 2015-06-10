@@ -36,7 +36,7 @@ NodeElementContainer::~NodeElementContainer()
 
 void NodeElementContainer::addNode(NodeElement *e)
 {
-	nodes.push_back(e);
+	nodes.emplace(e);
 }
 
 void NodeElementContainer::removeNode(NodeElement *e)
@@ -45,9 +45,12 @@ void NodeElementContainer::removeNode(NodeElement *e)
 
 	if(iter != nodes.end())
 	{
-		nodes.erase(iter);
-		removeChild(e, false);
-		delete e;
+		if(e)
+		{
+			removeChild(e, false);
+			nodes.erase(iter);
+			delete e;
+		}
 	}
 }
 
@@ -55,7 +58,7 @@ void NodeElementContainer::selectNode(NodeElement *e, bool set_active)
 {
 	if(!e->isSelected())
 	{
-		selectedNodes.push_back(e);
+		selectedNodes.emplace(e);
 		e->setSelected(true);
 	}
 
@@ -142,7 +145,8 @@ bool NodeElementContainer::toggleStickySelect() const
 
 NodeElement* NodeElementContainer::chooseActiveNode() const
 {
-	return (selectedNodes.size() > 0 ? selectedNodes[selectedNodes.size() - 1] : nullptr);
+	//TODO: Make this smarter
+	return (selectedNodes.size() > 0 ? *selectedNodes.begin() : nullptr);
 }
 
 void NodeElementContainer::setActiveNode(NodeElement *e)
@@ -205,11 +209,11 @@ void NodeElementContainer::onMouseDown(APoint m_pos, MouseButton b, bool direct)
 
 void NodeElementContainer::onMouseUp(APoint m_pos, MouseButton b, bool direct)
 {
-	if(direct && draggedNode)
-	{
-
-	}
-	else if(selecting && valid(b & MB::LEFT))
+	//if(direct && draggedNode)
+	//{
+//
+	//}
+	if(selecting && valid(b & MB::LEFT))
 	{
 		setActiveNode(chooseActiveNode());
 		selecting = false;
@@ -340,15 +344,15 @@ void NodeElementContainer::drawSelectionRect(GlInterface &gl)
 
 void NodeElementContainer::clearGraph()
 {
+	clearChildren();
+	draggedNode = nullptr;
+	clearSelected();
+
 	//Delete nodes
 	for(auto n : nodes)
-		if(n) delete n;
+		if(n)
+			delete n;
 	nodes.clear();
-	selectedNodes.clear();
-
-	draggedNode = nullptr;
-
-	clearChildren();
 }
 
 

@@ -1,6 +1,7 @@
 #include "MidiDataDisplay.h"
 
 #include "MIDI.h"
+#include "MidiData.h"
 
 
 /////MIDI GRAPH DATA/////
@@ -45,11 +46,11 @@ void MidiDataDisplay::setData(const MidiData *midi_data, float seconds_per_pixel
 
 		RVec abs_to_graph(seconds_per_pixel, (float)(NUM_MIDI_NOTES - 1)/size.y);
 
-		setGraph(GPoint(0.0f, 0.0f), GPoint(x_range.end, (float)(NUM_MIDI_NOTES - 1)), abs_to_graph, GVec(1.5f, 5.0f), gProps);
+		setGraph(GPoint(0.0f, 0.0f), GPoint(x_range.end, (float)(NUM_MIDI_NOTES - 1)), abs_to_graph, GVec(10.5f, 128.0), gProps);
 	}
 	
 	if(gProps & GProps::FIXED_WIDTH)
-		setWidth((float)midiData->getSpan().end * seconds_per_pixel);
+		setWidth((float)midiData->getLength() * seconds_per_pixel);
 }
 
 const MidiData* MidiDataDisplay::getData() const
@@ -71,7 +72,7 @@ void MidiDataDisplay::drawGraph(GlInterface &gl)
 	TimeRange t_range(v_origin.x, v_origin.x + v_size.x);
 
 	gl.setColor(Color(0.0f, 0.3f, 0.1f, 1.0f));
-	for(auto m : midiData->getConstNotes(t_range))
+	for(auto m : midiData->getOrderedConstNotesInRange(t_range))
 	{
 		gl.drawLine(graphToAbsolutePoint(GPoint(m->range.start, m->index)), graphToAbsolutePoint(GPoint(m->range.end, m->index)));
 	}

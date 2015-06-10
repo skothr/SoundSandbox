@@ -3,7 +3,7 @@
 
 #include "CompoundControl.h"
 
-class MidiTrackNode;
+class MidiBufferNode;
 class MidiDataDisplay;
 
 class Cursor;
@@ -11,7 +11,7 @@ class Cursor;
 class MidiTrackControl : public CompoundControl
 {
 protected:
-	MidiTrackNode		*node;
+	MidiBufferNode		*node;
 	MidiDataDisplay		*dataDisp = nullptr;
 
 	float				secondsPerPixel;
@@ -21,7 +21,7 @@ protected:
 	virtual void onMouseDown(APoint m_pos, MouseButton b, bool direct) override;
 
 public:
-	MidiTrackControl(ParentElement *parent_, APoint a_pos, float height, GuiStateFlags s_flags, MidiTrackNode *t_node, float seconds_per_pixel = -1.0f);
+	MidiTrackControl(ParentElement *parent_, APoint a_pos, float height, GuiStateFlags s_flags, MidiBufferNode *t_node, float seconds_per_pixel = -1.0f);
 	virtual ~MidiTrackControl();
 
 	static const GuiPropFlags	PROP_FLAGS;
@@ -31,7 +31,7 @@ public:
 
 	void setSecondsPerPixel(float seconds_per_pixel);
 
-	void setTrackNode(MidiTrackNode *new_node);
+	void setTrackNode(MidiBufferNode *new_node);
 
 	virtual void draw(GlInterface &gl) override;
 };

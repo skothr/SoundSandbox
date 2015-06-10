@@ -1,15 +1,15 @@
 /************************************************************************/
 /*! \class RtAudio
-    \brief Realtime audio i/o C++ classes.
+    \brief Time audio i/o C++ classes.
 
     RtAudio provides a common API (Application Programming Interface)
-    for realtime audio input/output across Linux (native ALSA, Jack,
+    for Time audio input/output across Linux (native ALSA, Jack,
     and OSS), Macintosh OS X (CoreAudio and Jack), and Windows
     (DirectSound, ASIO and WASAPI) operating systems.
 
     RtAudio WWW site: http://www.music.mcgill.ca/~gary/rtaudio/
 
-    RtAudio: realtime audio i/o C++ classes
+    RtAudio: Time audio i/o C++ classes
     Copyright (c) 2001-2014 Gary P. Scavone
 
     Permission is hereby granted, free of charge, to any person
@@ -4534,7 +4534,7 @@ bool RtApiWasapi::probeDeviceOpen( unsigned int device, StreamMode mode, unsigne
     goto Exit;
   }
 
-  if ( options && options->flags & RTAUDIO_SCHEDULE_REALTIME )
+  if ( options && options->flags & RTAUDIO_SCHEDULE_Time )
     stream_.callbackInfo.priority = 15;
   else
     stream_.callbackInfo.priority = 0;
@@ -6246,7 +6246,7 @@ void RtApiDs :: callbackEvent()
       // Stub: a serious risk of having a pre-emptive scheduling round
       // take place between the two GetCurrentPosition calls... but I'm
       // really not sure how to solve the problem.  Temporarily boost to
-      // Realtime priority, maybe; but I'm not sure what priority the
+      // Time priority, maybe; but I'm not sure what priority the
       // DirectSound service threads run at. We *should* be roughly
       // within a ms or so of correct.
 
@@ -7541,7 +7541,7 @@ bool RtApiAlsa :: probeDeviceOpen( unsigned int device, StreamMode mode, unsigne
     // Setup callback thread.
     stream_.callbackInfo.object = (void *) this;
 
-    // Set the thread attributes for joinable and realtime scheduling
+    // Set the thread attributes for joinable and Time scheduling
     // priority (optional).  The higher priority will only take affect
     // if the program is run as root or suid. Note, under Linux
     // processes with CAP_SYS_NICE privilege, a user can change
@@ -7552,12 +7552,12 @@ bool RtApiAlsa :: probeDeviceOpen( unsigned int device, StreamMode mode, unsigne
     pthread_attr_setdetachstate( &attr, PTHREAD_CREATE_JOINABLE );
 
 #ifdef SCHED_RR // Undefined with some OSes (eg: NetBSD 1.6.x with GNU Pthread)
-    if ( options && options->flags & RTAUDIO_SCHEDULE_REALTIME ) {
+    if ( options && options->flags & RTAUDIO_SCHEDULE_Time ) {
       // We previously attempted to increase the audio callback priority
       // to SCHED_RR here via the attributes.  However, while no errors
       // were reported in doing so, it did not work.  So, now this is
       // done in the alsaCallbackHandler function.
-      stream_.callbackInfo.doRealtime = true;
+      stream_.callbackInfo.doTime = true;
       int priority = options->priority;
       int min = sched_get_priority_min( SCHED_RR );
       int max = sched_get_priority_max( SCHED_RR );
@@ -7987,7 +7987,7 @@ static void *alsaCallbackHandler( void *ptr )
   bool *isRunning = &info->isRunning;
 
 #ifdef SCHED_RR // Undefined with some OSes (eg: NetBSD 1.6.x with GNU Pthread)
-  if ( &info->doRealtime ) {
+  if ( &info->doTime ) {
     pthread_t tID = pthread_self();	 // ID of this thread
     sched_param prio = { info->priority }; // scheduling priority of thread
     pthread_setschedparam( tID, SCHED_RR, &prio );
@@ -9031,14 +9031,14 @@ bool RtApiOss :: probeDeviceOpen( unsigned int device, StreamMode mode, unsigned
     // Setup callback thread.
     stream_.callbackInfo.object = (void *) this;
 
-    // Set the thread attributes for joinable and realtime scheduling
+    // Set the thread attributes for joinable and Time scheduling
     // priority.  The higher priority will only take affect if the
     // program is run as root or suid.
     pthread_attr_t attr;
     pthread_attr_init( &attr );
     pthread_attr_setdetachstate( &attr, PTHREAD_CREATE_JOINABLE );
 #ifdef SCHED_RR // Undefined with some OSes (eg: NetBSD 1.6.x with GNU Pthread)
-    if ( options && options->flags & RTAUDIO_SCHEDULE_REALTIME ) {
+    if ( options && options->flags & RTAUDIO_SCHEDULE_Time ) {
       struct sched_param param;
       int priority = options->priority;
       int min = sched_get_priority_min( SCHED_RR );

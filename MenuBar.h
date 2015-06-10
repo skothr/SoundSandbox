@@ -6,24 +6,10 @@
 #include "Label.h"
 
 #include "Callbacks.h"
+#include "ContextTree.h"
 
 class MenuBarButton;
-class MenuList;
-class MenuListItem;
-
-//Represents a menu as a tree.
-//	- Children are submenus.
-struct MenuTree
-{
-	std::string label = "";
-	voidCallback clickAction = nullptr;
-
-	std::vector<MenuTree> children;
-
-	MenuTree();
-	MenuTree(std::string label_, voidCallback click_action);
-	void addChild(const MenuTree &child);
-};
+class ContextWindow;
 
 class MenuBar : public CompoundControl
 {
@@ -37,14 +23,15 @@ protected:
 	virtual void onMouseDown(APoint m_pos, MouseButton b, bool direct) override;
 
 public:
-	MenuBar(ParentElement *parent_, GuiStateFlags s_flags, const MenuTree &menu, float bar_height);
+	MenuBar(ParentElement *parent_, GuiStateFlags s_flags, const ContextTree &tree, float bar_height);
 	virtual ~MenuBar();
 
 	static const GuiPropFlags PROP_FLAGS;
 	static const float DEFAULT_BAR_HEIGHT;
 	static const int TEXT_HEIGHT;
 
-	void closeAllMenus();
+	void closeAllMenus(MenuBarButton *except = nullptr);
+	bool submenuOpen();		//Return whether a child menu button has its menu open.
 	
 	virtual void draw(GlInterface &gl) override;
 };
@@ -52,9 +39,9 @@ public:
 class MenuBarButton : public CompoundControl
 {
 protected:
-	MenuBar		*topMenu = nullptr;
-	MenuList	*list = nullptr;
-	Label		*label = nullptr;
+	MenuBar			*menu = nullptr;
+	ContextWindow	*list = nullptr;
+	Label			*label = nullptr;
 	
 	bool		menuOpen = false;
 	
@@ -63,11 +50,13 @@ protected:
 	virtual void onMouseDown(APoint m_pos, MouseButton b, bool direct) override;
 	virtual void onMouseUp(APoint m_pos, MouseButton b, bool direct) override;
 
+	virtual void onMouseMove(APoint m_pos, AVec d_pos, bool direct) override;
+
 	virtual void drawBackground(GlInterface &gl) override;
 	virtual void setDefaultBg() override;
 
 public:
-	MenuBarButton(ParentElement *parent_, GuiStateFlags s_flags, const MenuTree &menu, float x_offset, float height);
+	MenuBarButton(ParentElement *parent_, GuiStateFlags s_flags, const ContextTree &tree, float x_offset, float height);
 	virtual ~MenuBarButton();
 
 	static const float	LABEL_SIDE_PADDING;
@@ -77,12 +66,13 @@ public:
 	void closeMenu();
 	void toggleMenu();
 	bool menuIsOpen() const;
+	bool submenuOpen();
 	
 	virtual void draw(GlInterface &gl) override;
 
 	friend class MenuBar;
 };
-
+/*
 class MenuList : public CompoundControl
 {
 protected:
@@ -94,6 +84,7 @@ public:
 	virtual ~MenuList();
 
 	void closeMenus();
+	bool submenuOpen();
 
 	virtual void draw(GlInterface &gl) override;
 
@@ -115,6 +106,9 @@ protected:
 	
 	virtual void onMouseDown(APoint m_pos, MouseButton b, bool direct) override;
 	virtual void onMouseUp(APoint m_pos, MouseButton b, bool direct) override;
+
+	virtual void onMouseMove(APoint m_pos, AVec d_pos, bool direct) override;
+
 	virtual void onSizeChanged(AVec d_size) override;
 
 	virtual void setDefaultBg() override;
@@ -135,5 +129,5 @@ public:
 	
 	virtual void draw(GlInterface &gl) override;
 };
-
+*/
 #endif	//APOLLO_MENU_BAR_H

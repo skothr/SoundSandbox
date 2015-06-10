@@ -356,18 +356,6 @@ struct MidiNote
 	//Pass end_time if both start and end times are known at the time of initialization (finished note)
 	MidiNote(MidiIndex midi_index, int note_velocity, Time start_time, Time end_time = -1.0);
 
-	//void setBaseStopper(const SampleStopper &ss);
-	//void addStopper(const SampleStopper &ss);
-	//Deletes stoppers within the given range (track time, not offset from start of note)
-	//void deleteStopperRange(TimeRange delete_range);
-	//Gets the closest stopper behind the given time (track time, not offset from start of note)
-	//SampleStopper getClosestStopper(Time time) const;
-
-	/*
-	void moveStart(Time offset);
-	void moveEnd(Time offset);
-	void moveNote(Time offset);
-	*/
 
 	void moveNote(TimeRange d_r);
 
@@ -377,8 +365,9 @@ struct MidiNote
 
 //Vector of MidiNote pointers (used for MIDI communication)
 //typedef std::vector<MidiNote*> PartialMidiData;
-typedef std::vector<const MidiNote*> ConstMidiData;
+//typedef std::vector<const MidiNote*> ConstMidiData;
 
+/*
 //Used for midi storage
 class MidiData
 {
@@ -420,7 +409,7 @@ public:
 	void getNotes(TimeRange range, MidiData &notes);
 	ConstMidiData getConstNotes(TimeRange range) const;
 };
-
+*/
 
 //TODO: Speed up finding midi notes within a chunk. (if possible)
 
@@ -448,9 +437,7 @@ struct MidiEvent
 	MidiChannel		channel = MidiChannel::INVALID;
 	unsigned int	numDataBytes = 0;
 
-	Time			time = 0.0,		//Time the event occurred
-					fTime = 0.0;	//Time the event is put into effect (functional time)
-									//	(e.g. playing it --> could be offset for live input)
+	Time			time = 0.0;		//Time the event occurred
 
 	union
 	{

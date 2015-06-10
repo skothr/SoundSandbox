@@ -4,8 +4,10 @@
 #include "WaveControl.h"
 #include "ScrollArea.h"
 #include "Node.h"
-#include "IONodes.h"
-#include "TrackNodes.h"
+#include "SpeakerNode.h"
+#include "MicrophoneNode.h"
+#include "InstrumentNode.h"
+#include "MidiDeviceNode.h"
 #include "TimeMapNode.h"
 #include "RenderNode.h"
 
@@ -13,6 +15,9 @@
 #include "ProjectTrackDisplay.h"
 
 #include "SimpleContainers.h"
+
+#include "AudioBufferNode.h"
+#include "MidiBufferNode.h"
 
 #include "AUtility.h"
 
@@ -22,8 +27,7 @@ const AVec PropertiesDisplay::PADDING(5.0f, 5.0f);
 
 PropertiesDisplay::PropertiesDisplay(ParentElement *parent_, APoint a_pos, AVec a_size, GuiStateFlags s_flags, ProjectTrackDisplay *ptd)
 	: GuiElement(parent_, a_pos, a_size, GuiProps(s_flags, PROP_FLAGS)),
-		Container(GuiProps(s_flags, PROP_FLAGS)),
-		displays(toIndex(NType::COUNT), nullptr)
+		Container(GuiProps(s_flags, PROP_FLAGS))
 {
 	//std::vector<GuiElement*> children;
 
@@ -34,16 +38,36 @@ PropertiesDisplay::PropertiesDisplay(ParentElement *parent_, APoint a_pos, AVec 
 	//attachElement(scroll, this, Side::RIGHT, 0);
 	//attachElement(scroll, this, Side::BOTTOM, 0);
 
-	displays[toIndex(NType::NONE)] = new Area(this, APoint(0, 0), a_size, DEFAULT_STATE);
-	displays[toIndex(NType::AUDIO_TRACK)] = new AudioTrackPropDisplay(this, APoint(0, 0), a_size, ptd);
-	displays[toIndex(NType::MIDI_TRACK)] = new MidiTrackPropDisplay(this, APoint(0, 0), a_size, ptd);
-	displays[toIndex(NType::AUDIO_MOD_TRACK)] = new AudioModTrackPropDisplay(this, APoint(0, 0), a_size);
-	displays[toIndex(NType::MIDI_MOD_TRACK)] = new MidiModTrackPropDisplay(this, APoint(0, 0), a_size);
-	displays[toIndex(NType::RENDER)] = new RenderPropDisplay(this, APoint(0, 0), a_size);
-	displays[toIndex(NType::SPEAKER)] = new SpeakerPropDisplay(this, APoint(0, 0), a_size);
-	//displays[toIndex(NType::TIME_MAP)] = new TimeMapPropDisplay(this, APoint(0, 0), a_size);
-	displays[toIndex(NType::INSTRUMENT)] = new InstrumentPropDisplay(this, APoint(0, 0), a_size);
-	displays[toIndex(NType::MIDI_DEVICE)] = new MidiDevicePropDisplay(this, APoint(0, 0), a_size);
+	displays.reserve(toIndex(NodeType::COUNT));
+
+	//NONE
+	displays.push_back(std::unique_ptr<PropDisplay>(new PropDisplay(this, APoint(0, 0), a_size, "(No Node Selected)")));
+	//STATIC_AUDIO_BUFFER
+	displays.push_back(std::unique_ptr<PropDisplay>(new StaticAudioBufferPropDisplay(this, APoint(0, 0), a_size, ptd)));
+	//STATIC_MIDI_BUFFER
+	displays.push_back(std::unique_ptr<PropDisplay>(new StaticMidiBufferPropDisplay(this, APoint(0, 0), a_size, ptd)));
+	//DYNAMIC_AUDIO_BUFFER
+	displays.push_back(std::unique_ptr<PropDisplay>(new DynamicAudioBufferPropDisplay(this, APoint(0, 0), a_size, ptd)));
+	//DYNAMIC_MIDI_BUFFER
+	displays.push_back(std::unique_ptr<PropDisplay>(new DynamicMidiBufferPropDisplay(this, APoint(0, 0), a_size, ptd)));
+	//STATIC_MOD_BUFFER
+	displays.push_back(std::unique_ptr<PropDisplay>(new AudioModTrackPropDisplay(this, APoint(0, 0), a_size)));
+	//DYNAMIC_MOD_BUFFER
+	displays.push_back(std::unique_ptr<PropDisplay>(new MidiModTrackPropDisplay(this, APoint(0, 0), a_size)));
+	//READ
+	displays.push_back(std::unique_ptr<PropDisplay>(new PropDisplay(this, APoint(0, 0), a_size, "TODO: Read Node")));
+	//WRITE
+	displays.push_back(std::unique_ptr<PropDisplay>(new PropDisplay(this, APoint(0, 0), a_size, "TODO: Write Node")));
+	//RENDER
+	displays.push_back(std::unique_ptr<PropDisplay>(new RenderPropDisplay(this, APoint(0, 0), a_size)));
+	//SPEAKER
+	displays.push_back(std::unique_ptr<PropDisplay>(new SpeakerPropDisplay(this, APoint(0, 0), a_size)));
+	//MICROPHONE
+	displays.push_back(std::unique_ptr<PropDisplay>(new MicrophonePropDisplay(this, APoint(0, 0), a_size)));
+	//INSTRUMENT
+	displays.push_back(std::unique_ptr<PropDisplay>(new InstrumentPropDisplay(this, APoint(0, 0), a_size)));
+	//MIDI_DEVICE
+	displays.push_back(std::unique_ptr<PropDisplay>(new MidiDevicePropDisplay(this, APoint(0, 0), a_size)));
 
 	//Warn if not all node types accounted for
 	if(!displays[displays.size() - 1])
@@ -51,15 +75,15 @@ PropertiesDisplay::PropertiesDisplay(ParentElement *parent_, APoint a_pos, AVec 
 					      WARNING: NOT ALL NODE TYPES ACCOUNTED FOR IN PROPERTIES DISPLAY!\n	\
 						  -----------------------------------\n\n\n";
 
-	for(unsigned int i = 0; i < displays.size(); i++)
+	for(auto &d : displays)
 	{
-		if(displays[i])
+		if(d)
 		{
-			displays[i]->attachTo(this, AttachSide::LEFT, 0);
-			displays[i]->attachTo(this, AttachSide::TOP, 0);
-			displays[i]->attachTo(this, AttachSide::RIGHT, 0);
-			displays[i]->attachTo(this, AttachSide::BOTTOM, 0);
-			displays[i]->hide();
+			d->attachTo(this, AttachSide::LEFT, 0);
+			d->attachTo(this, AttachSide::TOP, 0);
+			d->attachTo(this, AttachSide::RIGHT, 0);
+			d->attachTo(this, AttachSide::BOTTOM, 0);
+			d->hide();
 		}
 	}
 
@@ -75,8 +99,12 @@ PropertiesDisplay::PropertiesDisplay(ParentElement *parent_, APoint a_pos, AVec 
 
 PropertiesDisplay::~PropertiesDisplay()
 {
-	for(unsigned int i = 0; i < displays.size(); i++)
-		AU::safeDelete(displays[i]);
+	//for(auto &d : displays)
+	//{
+	//	if(d)
+	//		delete d;
+	//	d = nullptr;
+	//}
 
 	displays.clear();
 }
@@ -88,7 +116,7 @@ void PropertiesDisplay::updateDisplay()
 
 	if(activeNode && activeNode->getType() < NType::COUNT && displays[toIndex(activeNode->getType())])
 	{
-		dynamic_cast<PropDisplay*>(displays[toIndex(activeNode->getType())])->setNode(activeNode);
+		dynamic_cast<PropDisplay*>(displays[toIndex(activeNode->getType())].get())->setNode(activeNode);
 		displays[toIndex(activeNode->getType())]->show();
 	}
 	else
@@ -120,20 +148,21 @@ const GuiPropFlags PropDisplay::PROP_FLAGS = PFlags::ABSORB_SCROLL | PFlags::HAR
 
 PropDisplay::PropDisplay(ParentElement *parent_, APoint a_pos, AVec a_size, std::string title)
 	: GuiElement(parent_, a_pos, a_size, GuiProps(STATE_FLAGS, PROP_FLAGS)),
-		ScrollArea(parent_, a_pos, a_size, STATE_FLAGS), titleLabel(this, APoint(), DEFAULT_STATE, title, 25)
+		ScrollArea(parent_, a_pos, a_size, STATE_FLAGS),
+		titleLabel(new Label(this, APoint(0.0f, 0.0f), DEFAULT_STATE, title, 25))
 {
-	onSizeChanged(AVec());
+	onSizeChanged(AVec(0.0f, 0.0f));
 }
 
 void PropDisplay::setTitle(std::string title)
 {
-	titleLabel.setText(title);
-	onSizeChanged(AVec());
+	titleLabel->setText(title);
+	onSizeChanged(AVec(0.0f, 0.0f));
 }
 
 void PropDisplay::onSizeChanged(AVec d_size)
 {
-	titleLabel.centerAround(APoint(size.x/2.0f, 30));
+	titleLabel->centerAround(APoint(size.x/2.0f, 30));
 }
 
 void PropDisplay::setNode(Node *n)
@@ -155,69 +184,106 @@ void PropertiesDisplay::draw(GlInterface &gl)
 
 
 
-/////AUDIO BUFFER PROP DISPLAY/////
-AudioTrackPropDisplay::AudioTrackPropDisplay(ParentElement *parent_, APoint a_pos, AVec a_size, ProjectTrackDisplay *ptd)
+/////STATIC AUDIO BUFFER PROP DISPLAY/////
+StaticAudioBufferPropDisplay::StaticAudioBufferPropDisplay(ParentElement *parent_, APoint a_pos, AVec a_size, ProjectTrackDisplay *ptd)
 	: GuiElement(parent_, a_pos, a_size, GuiProps(STATE_FLAGS, PROP_FLAGS)),
 		PropDisplay(parent_, a_pos, a_size, "AUDIO TRACK"),
-		recordToggle(this, APoint(5, 100), DEFAULT_STATE, "Record"), trackDisp(ptd),
+		recordCheck(this, APoint(5, 100), DEFAULT_STATE, "RECORD"), trackDisp(ptd),
 		displayCheck(this, APoint(5, 150), DEFAULT_STATE, "DISPLAY")
 {
-	recordToggle.setClickFunction(std::bind(&AudioTrackPropDisplay::toggleRecord, this));
-	displayCheck.setCallback(std::bind(&AudioTrackPropDisplay::displayChanged, this));
+	recordCheck.setCallback(std::bind(&StaticAudioBufferPropDisplay::updateRecord, this));
+	displayCheck.setCallback(std::bind(&StaticAudioBufferPropDisplay::displayChanged, this));
 }
 
-void AudioTrackPropDisplay::toggleRecord()
+StaticAudioBufferPropDisplay::~StaticAudioBufferPropDisplay()
 {
-	/*
-	AudioTrackNode *at_node = dynamic_cast<AudioTrackNode*>(node);
-	if(at_node && tmn)
-	{
-		bool now_recording = !at_node->isRecording();
 
-		at_node->setRecording(now_recording ? tmn->getCursor() : nullptr);
-		tmn->setPlaying(now_recording);
-	}
-	*/
 }
 
-void AudioTrackPropDisplay::displayChanged()
+
+void StaticAudioBufferPropDisplay::updateRecord()
+{
+	StaticAudioBufferNode *a_node = dynamic_cast<StaticAudioBufferNode*>(node);
+	if(a_node)
+	{
+		a_node->setRecording(isRecording() ? trackDisp->getCursor() : nullptr);
+	}
+}
+
+void StaticAudioBufferPropDisplay::displayChanged()
 {
 	if(trackDisp && node)
 	{
 		std::cout << displayCheck.getValue() << "\n";
 
 		if(displayCheck.getValue())
-			trackDisp->addTrack(dynamic_cast<AudioTrackNode*>(node));
+			trackDisp->addTrack(dynamic_cast<AudioBufferNode*>(node));
 		else
-			trackDisp->removeTrack(dynamic_cast<AudioTrackNode*>(node));
+			trackDisp->removeTrack(dynamic_cast<AudioBufferNode*>(node));
+	}
+}
+
+bool StaticAudioBufferPropDisplay::isRecording() const
+{
+	return recordCheck.getValue();
+}
+
+
+/////DYNAMIC AUDIO BUFFER PROP DISPLAY/////
+DynamicAudioBufferPropDisplay::DynamicAudioBufferPropDisplay(ParentElement *parent_, APoint a_pos, AVec a_size, ProjectTrackDisplay *ptd)
+	: GuiElement(parent_, a_pos, a_size, GuiProps(STATE_FLAGS, PROP_FLAGS)),
+		PropDisplay(parent_, a_pos, a_size, "AUDIO TRACK"),
+		trackDisp(ptd), displayCheck(this, APoint(5, 150), DEFAULT_STATE, "DISPLAY")
+{
+	displayCheck.setCallback(std::bind(&DynamicAudioBufferPropDisplay::displayChanged, this));
+}
+
+void DynamicAudioBufferPropDisplay::displayChanged()
+{
+	if(trackDisp && node)
+	{
+		std::cout << displayCheck.getValue() << "\n";
+
+		if(displayCheck.getValue())
+			trackDisp->addTrack(dynamic_cast<AudioBufferNode*>(node));
+		else
+			trackDisp->removeTrack(dynamic_cast<AudioBufferNode*>(node));
 	}
 }
 
 
 
-/////MIDI BUFFER PROP DISPLAY/////
-MidiTrackPropDisplay::MidiTrackPropDisplay(ParentElement *parent_, APoint a_pos, AVec a_size, ProjectTrackDisplay *ptd)
+/////STATIC MIDI BUFFER PROP DISPLAY/////
+StaticMidiBufferPropDisplay::StaticMidiBufferPropDisplay(ParentElement *parent_, APoint a_pos, AVec a_size, ProjectTrackDisplay *ptd)
 	: GuiElement(parent_, a_pos, a_size, GuiProps(STATE_FLAGS, PROP_FLAGS)),
 		PropDisplay(parent_, a_pos, a_size, "MIDI TRACK"),
-		recordToggle(this, APoint(5, 100), DEFAULT_STATE, "Record"), trackDisp(ptd)
+		recordCheck(this, APoint(5, 100), DEFAULT_STATE, "RECORD"), trackDisp(ptd)
 {
-	recordToggle.setClickFunction(std::bind(&MidiTrackPropDisplay::toggleRecord, this));
+	recordCheck.setCallback(std::bind(&StaticMidiBufferPropDisplay::updateRecord, this));
 }
 
-void MidiTrackPropDisplay::toggleRecord()
+void StaticMidiBufferPropDisplay::updateRecord()
 {
-	/*
-	MidiTrackNode *mt_node = dynamic_cast<MidiTrackNode*>(node);
-	if(mt_node && tmn)
+	StaticMidiBufferNode *m_node = dynamic_cast<StaticMidiBufferNode*>(node);
+	if(m_node)
 	{
-		bool now_recording = !mt_node->isRecording();
-
-		mt_node->setRecording(now_recording ? tmn->getCursor() : nullptr);
-		tmn->setPlaying(now_recording);
+		m_node->setRecording(isRecording() ? trackDisp->getCursor() : nullptr);
 	}
-	*/
 }
 
+bool StaticMidiBufferPropDisplay::isRecording() const
+{
+	return recordCheck.getValue();
+}
+
+
+/////DYNAMIC MIDI BUFFER PROP DISPLAY/////
+DynamicMidiBufferPropDisplay::DynamicMidiBufferPropDisplay(ParentElement *parent_, APoint a_pos, AVec a_size, ProjectTrackDisplay *ptd)
+	: GuiElement(parent_, a_pos, a_size, GuiProps(STATE_FLAGS, PROP_FLAGS)),
+		PropDisplay(parent_, a_pos, a_size, "MIDI TRACK"), trackDisp(ptd)
+{
+
+}
 
 
 /////AUDIO MOD BUFFER PROP DISPLAY/////
@@ -267,7 +333,7 @@ void RenderPropDisplay::update()
 	RenderNode *n = dynamic_cast<RenderNode*>(node);
 	
 	if(n)
-		bufferDisp->setData((AudioData*)(n->getBuffer()), true, true, false, -1.0f);
+		bufferDisp->setData((const AudioData*)(n->getBuffer()), true, true, false, -1.0f);
 }
 
 
@@ -295,6 +361,35 @@ SpeakerPropDisplay::~SpeakerPropDisplay()
 void SpeakerPropDisplay::update()
 {
 	SpeakerNode *n = dynamic_cast<SpeakerNode*>(node);
+	
+	if(n)
+		bufferDisp->setData(n->getBuffer(), true, true, false, -1.0f);
+}
+
+
+/////MICROPHONE PROP DISPLAY/////
+MicrophonePropDisplay::MicrophonePropDisplay(ParentElement *parent_, APoint a_pos, AVec a_size)
+	: GuiElement(parent_, a_pos, a_size, GuiProps(STATE_FLAGS, PROP_FLAGS)),
+		PropDisplay(parent_, a_pos, a_size, "SPEAKER")
+{
+	AVec PADDING(5.0f, 5.0f);
+
+	bufferDisp = new AudioDataDisplay(this, PADDING, AVec(size.x - 2.0f*PADDING.x, 200), DEFAULT_STATE, nullptr, GraphProps::NONE, true, true, false, -1.0f); 
+	bufferDisp->attachTo(this, Side::LEFT, PADDING.x);
+	bufferDisp->attachTo(this, Side::RIGHT, PADDING.x);
+	bufferDisp->attachTo(this, Side::TOP, PADDING.y + 50.0f);
+
+	//addChild(bufferDisp, false);
+}
+
+MicrophonePropDisplay::~MicrophonePropDisplay()
+{
+	AU::safeDelete(bufferDisp);
+}
+ 
+void MicrophonePropDisplay::update()
+{
+	MicrophoneNode *n = dynamic_cast<MicrophoneNode*>(node);
 	
 	if(n)
 		bufferDisp->setData(n->getBuffer(), true, true, false, -1.0f);

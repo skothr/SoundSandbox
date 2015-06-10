@@ -8,6 +8,9 @@
 #include "Keyboard.h"
 #include "ScrollBar.h"
 
+#include "AudioBufferNode.h"
+#include "MidiBufferNode.h"
+
 /////PROJECT TRACK DISPLAY/////
 const GuiPropFlags	ProjectTrackDisplay::PROP_FLAGS				= PFlags::HARD_BACK;
 const float			ProjectTrackDisplay::TRACK_HEIGHT			= 100.0f,
@@ -77,7 +80,7 @@ void ProjectTrackDisplay::onScroll(APoint m_pos, AVec d_scroll, bool direct)
 	}
 }
 
-void ProjectTrackDisplay::addTrack(AudioTrackNode *atn)
+void ProjectTrackDisplay::addTrack(AudioBufferNode *atn)
 {
 	AudioTrackControl	*atc = new AudioTrackControl(trackList, APoint(0.0f, 0.0f), TRACK_HEIGHT, DEFAULT_STATE_FLOAT, atn, absoluteToSample);
 	atc->setCursor(cursor);
@@ -90,28 +93,37 @@ void ProjectTrackDisplay::addTrack(AudioTrackNode *atn)
 
 	for(auto n : child_tracks)
 	{
-		if(n.node->getType() == NodeType::AUDIO_TRACK)
+		ElementTree *child_tree = nullptr;
+		AudioTrackControl *audio = nullptr;
+		MidiTrackControl *midi = nullptr;
+
+		switch(n.node->getType())
 		{
-			AudioTrackControl *audio = new AudioTrackControl(trackList, APoint(0.0f, 0.0f), TRACK_HEIGHT, DEFAULT_STATE_FLOAT, dynamic_cast<AudioTrackNode*>(n.node), absoluteToSample);
+		case NodeType::STATIC_AUDIO_BUFFER:
+		case NodeType::DYNAMIC_AUDIO_BUFFER:
+			audio = new AudioTrackControl(trackList, APoint(0.0f, 0.0f), TRACK_HEIGHT, DEFAULT_STATE_FLOAT, dynamic_cast<AudioBufferNode*>(n.node), absoluteToSample);
 			
 			audio->setCursor(cursor);
 
-			ElementTree child_tree(audio, true);
+			child_tree = new ElementTree(audio, true);
 			audioTrackControls.push_back(audio);
 
-			track_tree.addChild(child_tree);
-		}
-		else if(n.node->getType() == NodeType::MIDI_TRACK)
-		{
-			MidiTrackControl *midi = new MidiTrackControl(trackList, APoint(0.0f, 0.0f), TRACK_HEIGHT, DEFAULT_STATE_FLOAT, dynamic_cast<MidiTrackNode*>(n.node), absoluteToSample/cursor->getSampleRate());
+			track_tree.addChild(*child_tree);
+			break;
+		case NodeType::STATIC_MIDI_BUFFER:
+		case NType::DYNAMIC_MIDI_BUFFER:
+			midi = new MidiTrackControl(trackList, APoint(0.0f, 0.0f), TRACK_HEIGHT, DEFAULT_STATE_FLOAT, dynamic_cast<MidiBufferNode*>(n.node), absoluteToSample/cursor->getSampleRate());
 			
 			midi->setCursor(cursor);
 
-			ElementTree child_tree(midi, true);
+			child_tree = new ElementTree(midi, true);
 			midiTrackControls.push_back(midi);
 
-			track_tree.addChild(child_tree);
+			track_tree.addChild(*child_tree);
+			break;
 		}
+		if(child_tree)
+			delete child_tree;
 	}
 
 	trackTrees.push_back(track_tree);
@@ -121,7 +133,7 @@ void ProjectTrackDisplay::addTrack(AudioTrackNode *atn)
 	updateResources();
 }
 
-void ProjectTrackDisplay::removeTrack(AudioTrackNode *atn)
+void ProjectTrackDisplay::removeTrack(AudioBufferNode *atn)
 {
 	auto iter = std::find(trackNodes.begin(), trackNodes.end(), atn);
 	if(iter != trackNodes.end())
@@ -144,19 +156,19 @@ void ProjectTrackDisplay::removeTrack(AudioTrackNode *atn)
 
 bool ProjectTrackDisplay::isPlaying() const
 {
-	return cursor && cursor->active;
+	return cursor && cursor->isActive();
 }
 
 void ProjectTrackDisplay::play()
 {
 	if(cursor)
-		cursor->active = true;
+		cursor->setActive(true);
 }
 
 void ProjectTrackDisplay::stop()
 {
 	if(cursor)
-		cursor->active = false;
+		cursor->setActive(false);
 }
 
 void ProjectTrackDisplay::setCursor(Cursor *new_cursor)
@@ -176,7 +188,7 @@ Cursor* ProjectTrackDisplay::getCursor()
 	return cursor;
 }
 
-//void ProjectTrackDisplay::update(double dt)
+//void ProjectTrackDisplay::update(const Time &dt)
 //{
 //}
 

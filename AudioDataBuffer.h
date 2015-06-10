@@ -19,6 +19,8 @@ public:
 	AudioAmpChunk* shiftBuffer();
 
 	AudioAmpChunk* getActiveChunk();
+	AudioAmpChunk* getNextChunk();
+	AudioAmpChunk* getLastChunk();
 };
 
 
@@ -36,6 +38,8 @@ public:
 	AudioVelChunk* shiftBuffer();
 
 	AudioVelChunk* getActiveChunk();
+	AudioVelChunk* getNextChunk();
+	AudioVelChunk* getLastChunk();
 };
 
 #endif	//APOLLO_AUDIO_DATA_BUFFER_H

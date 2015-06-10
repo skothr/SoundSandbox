@@ -4,6 +4,8 @@
 #include "TransformContainer.h"
 #include "GraphDisplay.h"
 
+#include <unordered_set>
+
 class NodeElement;
 
 //A graph-like TransformContainer that holds a set of MovableElements that can be selected, moved around, etc.
@@ -12,8 +14,8 @@ class NodeElementContainer : public TransformContainer//, public GraphDisplay
 protected:
 	NodeElementContainer(GuiStateFlags s_flags, APoint graph_min, APoint graph_max, AVec base_graph_step, AVec zoom_step);
 
-	std::vector<NodeElement*>	nodes;
-	std::vector<NodeElement*>	selectedNodes;
+	std::unordered_set<NodeElement*>	nodes;
+	std::unordered_set<NodeElement*>	selectedNodes;
 
 	//Current node that is being dragged
 	NodeElement					*draggedNode = nullptr;

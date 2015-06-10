@@ -5,6 +5,8 @@
 #include "Container.h"
 #include "TransformContainer.h"
 
+#include "NodeControl.h"
+
 /////ACTIVE ELEMENT/////
 
 ActiveElement::ActiveElement(GuiProps flags)
@@ -65,12 +67,15 @@ bool ActiveElement::mouseMove(APoint m_pos, AVec d_pos, bool blocked)
 			}
 			else
 			{
+				bool drag = false;
+
 				switch(cState)
 				{
 				case CS::NONE:
 				case CS::HOVERING:
 					//Now hovering
 					cState = direct ? CS::HOVERING : CS::NONE;
+					drag |= (direct && Mouse::buttonDown(MB::LEFT));	//TEMP
 					break;
 					
 				case CS::DROP_HOVERING:
@@ -85,13 +90,17 @@ bool ActiveElement::mouseMove(APoint m_pos, AVec d_pos, bool blocked)
 
 				case CS::DRAGGING:
 					//Keep dragging
-					onDrag(a_m_pos, d_pos, direct);
+					drag = true;
+					//direct &= clickSelect;
 					break;
 
 				default:
 					//Invalid control state??
 					break;
 				}
+
+				if(drag)
+					onDrag(a_m_pos, d_pos, direct);
 			}
 			
 			onMouseMove(a_m_pos, d_pos, direct);
@@ -100,7 +109,7 @@ bool ActiveElement::mouseMove(APoint m_pos, AVec d_pos, bool blocked)
 		else
 			cState = CS::NONE;
 
-		return (blocking || direct || absorbed) && hardBack;
+		return (blocking || (direct && cState != CS::DRAGGING) || absorbed) && hardBack;
 	}
 	else
 		cState = CS::NONE;
@@ -346,7 +355,7 @@ void ActiveElement::setAllFgStateColors(Color col)
 		fgStateColors[i] = col;
 }
 
-void ActiveElement::update(double dt)
+void ActiveElement::update(const Time &dt)
 {
 	bgColor = bgStateColors[cState];
 }

@@ -47,6 +47,7 @@ NodeGraphDisplay::~NodeGraphDisplay()
 	for(auto nc : nodeControls)
 		AU::safeDelete(nc);
 	nodeControls.clear();
+	selectedControls.clear();
 
 	//Delete connections
 	for(auto c : connections)
@@ -57,6 +58,13 @@ NodeGraphDisplay::~NodeGraphDisplay()
 
 void NodeGraphDisplay::reset()
 {
+	clearChildren();
+
+	//Clear other variables
+	draggedNode = nullptr;
+	draggedConnector = 0;
+	connectionIndex = -1;
+
 	//Delete node controls
 	for(auto nc : nodeControls)
 		AU::safeDelete(nc);
@@ -67,14 +75,6 @@ void NodeGraphDisplay::reset()
 	for(auto c : connections)
 		AU::safeDelete(c);
 	connections.clear();
-
-	//Clear other variables
-	draggedNode = nullptr;
-	draggedConnector = 0;
-	connectionIndex = -1;
-
-	//removeAllBody();
-	clearChildren();
 
 	//Re-init graph
 	initGraph();
@@ -707,7 +707,7 @@ void NodeGraphDisplay::drawGraph(GlInterface &gl)
 	gl.drawShape(GL_LINES, points);
 }
 
-void NodeGraphDisplay::update(double dt)
+void NodeGraphDisplay::update(const Time &dt)
 {
 	ParentElement::update(dt);
 
@@ -966,7 +966,7 @@ bool NodeControl::respondToClick(APoint m_pos, MouseButton b)
 	return valid(b & (NODEGRAPH_CONNECT_NODES_NODE_BTN | NODEGRAPH_MOVE_NODES_BTN | NODEGRAPH_SELECT_NODES_BTN));
 }
 
-void NodeControl::update(double dt)
+void NodeControl::update(const Time &dt)
 {
 	ParentElement::update(dt);
 	ActiveElement::update(dt);
@@ -1313,7 +1313,7 @@ bool NodeConnectionControl::respondToClick(APoint m_pos, MouseButton b)
 	//return (controlState == ControlState::HOVERING);
 }
 
-void NodeConnectionControl::update(double dt)
+void NodeConnectionControl::update(const Time &dt)
 {
 	if(fromNode && toNode)
 	{

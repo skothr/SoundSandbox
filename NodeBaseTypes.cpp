@@ -3,6 +3,10 @@
 #include "Samplers.h"
 #include "AUtility.h"
 
+#include "NodePackets.h"
+
+#include "Cursor.h"
+
 
 /////TRACK NODE/////
 //(Template, defined in header)
@@ -11,44 +15,44 @@
 /////MOD NODE/////
 
 ModNode::ModNode()
-	: Node(NType::INVALID, "Null Mod Node", "Unspecified")
+	: Node(nullptr, NType::INVALID, "Null Mod Node", "Unspecified")
 {
 
 }
 
 
 
-/////READ NODE/////
+/////INPUT NODE/////
 
-ReadNode::ReadNode()
-	: Node(NType::INVALID, "Null Read Node", "Unspecified")
+InputNode::InputNode()
+	: Node(nullptr, NType::INVALID, "Null Read Node", "Unspecified")
 {
 
 }
 
 /*
-bool ReadNode::canPush()
+bool InputNode::canPush()
 {
 	return false;
 }
 */
 
-/////WRITE NODE/////
+/////OUTPUT NODE/////
 
-WriteNode::WriteNode()
-	: Node(NType::INVALID, "Null Write Node", "Unspecified")
+OutputNode::OutputNode()
+	: Node(nullptr, NType::INVALID, "Null Write Node", "Unspecified")
 {
 
 }
 
 /*
-bool WriteNode::canPull()
+bool OutputNode::canPull()
 {
 	return false;
 }
 
 
-bool WriteNode::canFlush()
+bool OutputNode::canFlush()
 {
 	return false;
 }

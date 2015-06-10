@@ -9,18 +9,20 @@
 
 const GuiPropFlags Window::PROP_FLAGS = PFlags::DRAGGABLE | PFlags::DROPPABLE | PFlags::HARD_BACK | PFlags::ABSORB_SCROLL;
 
+GlInterface Window::gl(ViewRect(APoint(0, 0), AVec(100.0f, 100.0f)));
+
 Window::Window(std::string label_, APoint a_pos, AVec a_size, GuiStateFlags s_flags)
 	: GuiElement(nullptr, a_pos, a_size, GuiProps(s_flags, PROP_FLAGS)),
 		Container(GuiProps(s_flags, PROP_FLAGS)),
-		title(label_), gl(ViewRect(APoint(0, 0), a_size))
+		title(label_)
 {
 	WindowStyle s;
 	s.visible = GuiProps::isVisible(s_flags);
 
-	windowImpl = new WindowWin32(this, Vec2i((int)size.x, (int)size.y), title, s);
+	windowImpl = new WindowWin32(this, nullptr, Vec2i(size), title, s);
 	setPos(pos.x, pos.y);
 	
-	windowImpl->setResizeFunction(std::bind(&Window::onResize, this, std::placeholders::_1, std::placeholders::_2));
+	//windowImpl->setResizeFunction(std::bind(&Window::onResize, this, std::placeholders::_1, std::placeholders::_2));
 
 	//Initialize key states
 	for(unsigned int i = 0; i < static_cast<unsigned int>(Keys::K_COUNT); i++)
@@ -29,9 +31,28 @@ Window::Window(std::string label_, APoint a_pos, AVec a_size, GuiStateFlags s_fl
 	updateResources();
 }
 
+Window::Window(APoint a_pos, AVec a_size, GuiStateFlags s_flags)
+	: GuiElement(nullptr, a_pos, a_size, GuiProps(s_flags, PROP_FLAGS)),
+		Container(GuiProps(s_flags, PROP_FLAGS)),
+		title("")
+{
+	//setPos(pos.x, pos.y);
+	
+	//Initialize key states
+	for(unsigned int i = 0; i < static_cast<unsigned int>(Keys::K_COUNT); i++)
+		keyStates[i] = false;
+
+	//updateResources();
+}
+
 Window::~Window()
 {
 	AU::safeDelete(windowImpl);
+}
+
+void Window::loadResources()
+{
+	//gl = GlInterface();
 }
 
 
@@ -65,16 +86,40 @@ void Window::setSize(AVec a_size)
 	setSize(a_size.x, a_size.y);
 }
 
+APoint Window::getClientPos()
+{
+	return APoint(windowImpl->getClientPosition());
+}
+
 void Window::setFocus(bool in_focus)
 {
-	inFocus = in_focus;
 	windowImpl->setFocus(inFocus);
+	ActiveElement::setFocus(in_focus);
+}
+
+
+void Window::onShow()
+{
+	windowImpl->setVisible(true);
+}
+
+void Window::onHide()
+{
+	windowImpl->setVisible(false);
+}
+
+void Window::addChildWindow(Window *child_window)
+{
+	childWindows.push_back(child_window);
 }
 
 void Window::handleWindow()
 {
 	Mouse::updateStates();
 	Keyboard::updateStates();
+
+	for(auto w : childWindows)
+		w->windowImpl->handleEvents();
 
 	windowImpl->handleEvents();
 }
@@ -175,11 +220,14 @@ void Window::handleEvent(const Event &e)
 			d_m_pos = m_pos - last_m_pos;
 			last_m_pos = m_pos;
 
-			//std::cout << m_pos.x << ", " << m_pos.y << "\n";
-			blocked = false;
+			if(abs(d_m_pos.x) > 0 || abs(d_m_pos.y) > 0)
+			{
+				//std::cout << m_pos.x << ", " << m_pos.y << "\n";
+				blocked = false;
 
-			blocked |= floatingChildren.mouseMove(m_pos, d_m_pos, blocked);
-			blocked |= bodyChildren.mouseMove(m_pos, d_m_pos, blocked);
+				blocked |= floatingChildren.mouseMove(m_pos, d_m_pos, blocked);
+				blocked |= bodyChildren.mouseMove(m_pos, d_m_pos, blocked);
+			}
 
 			break;
 				
@@ -321,8 +369,10 @@ void Window::onResize(Point2i p, Vec2i s)
 	draw();
 }
 
-void Window::update(double dt)
+void Window::update(const Time &dt)
 {
+	//windowImpl->setActive(windowImpl->getHDC());
+	//glClearColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a);
 	Container::update(dt);
 }
 
@@ -334,32 +384,34 @@ void Window::draw(GlInterface &gl)
 
 void Window::draw()
 {
-	if(windowImpl)
+	if(windowImpl && visible)
 	{
-		gl.setBaseSpace(VirtualTransform::IDENTITY_MAT, VirtualTransform::IDENTITY_MAT, ViewRect(APoint(0, 0), size));
-
-		windowImpl->setVisible(visible);
 		windowImpl->setActive();
-		
+		GlInterface gl2(ViewRect(APoint(0, 0), size));
+
 		//Draw background
-		glClearColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a);
+		resetView();
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		//isolateViewport(gl);
-		drawChildren(gl);
-		//restoreViewport(gl);
-
-		windowImpl->swapBuffers();
+		drawChildren(gl2);
+		windowImpl->swapBuffers(windowImpl->getHDC());
 	}
+}
+
+void Window::resetView()
+{
+	glClearColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a);
 }
 
 bool Window::isOpen()
 {
-	return open;//windowImpl != nullptr;
+	return open;
 }
 
 void Window::close()
 {
 	open = false;
-	AU::safeDelete(windowImpl);
+	
+	delete windowImpl;
+	windowImpl = nullptr;
 }

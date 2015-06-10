@@ -18,18 +18,24 @@ std::string toString(std::wstring wstr)
 	return std::string(wstr.begin(), wstr.end());
 }
 
-std::vector<WindowClass*> WindowWin32::classes;
 
-WindowWin32::WindowWin32(Window *owner_, Vec2i size, std::string title, WindowStyle &style)
-	: m_lastSize(size), owner(owner_)
+/////WINDOW WIN32/////
+std::vector<WindowClass*> WindowWin32::classes;
+GlContext *WindowWin32::context = nullptr;
+
+WindowWin32::WindowWin32(Window *owner_, WindowWin32 *parent_window, Vec2i size, std::string title, WindowStyle &style)
+	: m_lastSize(size), owner(owner_), parentWindow(parent_window)
 {
 	//Get position and size
 	HDC screenDC = GetDC(nullptr);
 	int x = (GetDeviceCaps(screenDC, HORZRES) - static_cast<int>(size.x))/2;
 	int y = (GetDeviceCaps(screenDC, VERTRES) - static_cast<int>(size.y))/2;
 
+	if(parentWindow)
+		parentWindow->children.push_back(this);
+
 	//Choose window style
-	windowStyle = style.getWindowStyle();
+	windowStyle = style.getWindowStyle() | (parentWindow ? WS_CHILD : WS_OVERLAPPED);
 	DWORD winExStyle = style.getWindowExStyle();
 	//Default style:
 	//DWORD winStyle = WS_CAPTION | WS_MINIMIZEBOX | WS_THICKFRAME | WS_MAXIMIZEBOX | WS_SYSMENU | WS_VISIBLE;
@@ -47,16 +53,30 @@ WindowWin32::WindowWin32(Window *owner_, Vec2i size, std::string title, WindowSt
 	
 	LPCWSTR szClassName = windowClass->windowClass.lpszClassName;
 
+	WindowHandle parent_handle = parentWindow ? parentWindow->getHandle() : nullptr;
+
 	//Create window
 	//m_handle = CreateWindowEx(winExStyle, szClassName, toWString(title).c_str(), winStyle, x, y, size.x, size.y, nullptr, nullptr, GetModuleHandle(nullptr), this);
-	m_handle = CreateWindow(szClassName, toWString(title).c_str(), windowStyle, x, y, size.x, size.y, nullptr, nullptr, GetModuleHandle(nullptr), this);
+	m_handle = CreateWindow(szClassName, toWString(title).c_str(), windowStyle, x, y, size.x, size.y, parent_handle, nullptr, GetModuleHandle(nullptr), this);
+	setFocus(inFocus);
 
-	context = new GlContext();
-	context->init(m_handle);
+	m_hdc = GetDC(m_handle);
+
+	//Only create one glContext
+	if(!context)
+	{
+		context = new GlContext();
+		context->init(m_handle);
+	}
+	else
+		context->setUpPixelFormat(m_hdc);
 }
 
 WindowWin32::~WindowWin32()
 {
+	if(parentWindow)
+		parentWindow->children.erase(std::find(parentWindow->children.begin(), parentWindow->children.end(), this));
+
 	close();
 
 	if(m_icon)
@@ -66,13 +86,17 @@ WindowWin32::~WindowWin32()
 		DestroyWindow(m_handle);
 }
 
-void WindowWin32::cleanUp()
+void WindowWin32::cleanup()
 {
 	//Unregister all classes
 	for(unsigned int i = 0; i < classes.size(); i++)
 		classes[i]->deregisterClass();
 
 	classes.clear();
+
+	if(context)
+		delete context;
+	context = nullptr;
 }
 
 
@@ -199,6 +223,16 @@ Point2i WindowWin32::getClientMousePos()
 	return Point2i(p.x, p.y);
 }
 
+WindowHandle WindowWin32::getHandle() const
+{
+	return m_handle;
+}
+
+HDC WindowWin32::getHDC() const
+{
+	return m_hdc;
+}
+
 void WindowWin32::setSize(Vec2i size)
 {
 	RECT r = {0, 0, static_cast<long>(size.x), static_cast<long>(size.y)};
@@ -207,31 +241,49 @@ void WindowWin32::setSize(Vec2i size)
 	int w = r.right - r.left;
 	int h = r.bottom - r.top;
 
-	SetWindowPos(m_handle, nullptr, 0, 0, w, h, SWP_NOMOVE | SWP_NOZORDER);
+	SetWindowPos(m_handle, nullptr, 0, 0, w, h, SWP_NOMOVE | SWP_NOZORDER | (inFocus ? 0x0000 : SWP_NOACTIVATE));
 }
 
 void WindowWin32::setPosition(Point2i pos)
 {
-	SetWindowPos(m_handle, nullptr, pos.x, pos.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+	SetWindowPos(m_handle, nullptr, pos.x, pos.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | (inFocus ? 0x0000 : SWP_NOACTIVATE));
 }
 
 void WindowWin32::setVisible(bool visible)
 {
-	ShowWindow(m_handle, visible ? SW_SHOW : SW_HIDE);
+	ShowWindow(m_handle, visible ? (inFocus ? SW_SHOW : SW_SHOWNOACTIVATE) : SW_HIDE);
 }
 
 void WindowWin32::setActive()
 {
-	context->setActive();
+	if(context)
+		context->setActive(m_hdc);
 }
 
 void WindowWin32::setFocus(bool in_focus)
 {
+	if(owner == nullptr)
+	{
+		if(in_focus)
+			std::cout << "FOCUS\n";
+		else
+			std::cout << "NO FOCUS\n";
+	}
+
+
+	bool changed = (inFocus != in_focus);
 	inFocus = in_focus;
+	if(changed && inFocus)
+		SetFocus(m_handle);
 }
 bool WindowWin32::isInFocus()
 {
 	return inFocus;
+}
+
+GlContext* WindowWin32::getContext()
+{
+	return context;
 }
 
 
@@ -277,75 +329,182 @@ bool WindowWin32::checkEvent(Event &e)
 	return (e.type != Events::INVALID);
 }
 
-void WindowWin32::processEvent(UINT msg, WPARAM wParam, LPARAM lParam)
+LRESULT WindowWin32::processEvent(WindowHandle hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-	if(!m_handle) return;
+	//if(!m_handle)
+	//	return false;
 
 	Event e;
 	Vec2i currSize;
 	Point2i winPos;
 	RECT r;
+	MouseButton b = MB::NONE;
 
 	//TODO: fix this mess (WM_?BUTTONUP wParam isnt the button that had the event, its a list of buttons that are still down!)
 	// Use downButtons (member) instead
 	bool btn_up_skip = false;
 
+	bool is_parent = !parentWindow;
+
+	LRESULT result = 0;
+
+	//Whether to propogate this event to Windows (return value)
+	//	Default --> TRUE
+	//bool propogate = true;
+
+	std::cout << std::hex << msg << "\n";
+	
 	switch(msg)
 	{
 	case WM_CLOSE:
 		e.type = Events::CLOSED;
 		owner->handleEvent(e);
-		//pushEvent(e);
+
+		//Make sure Window class has a change to catch close event and return when it wants to
+		result = is_parent ? 0 : DefWindowProc(hwnd, msg, wParam, lParam);
 		break;
 
 	case WM_DESTROY:
 		close();
+		PostQuitMessage(0);
+		result = 0;
+		break;
+		
+	//Dont steal focus with alt or f10 (??)
+	case WM_SYSCOMMAND:
+		//if(wParam == SC_KEYMENU)
+		//	result = 0;
+		//else
+			result = DefWindowProc(hwnd, msg, wParam, lParam);
+
+		break;
+
+	//Dont erase background while resizing (prevents flickering)
+	case WM_ERASEBKGND:
+		result = 0;	//Do nothing, and return that it erased
+		//result = DefWindowProc(hwnd, msg, wParam, lParam);
 		break;
 
 	case WM_PAINT:
+		owner->draw();
+		result = DefWindowProc(hwnd, msg, wParam, lParam);
 		break;
 
-		/*
+		
 	case WM_SETFOCUS:
-		setFocus(true);
-		e.type = EVENT_GAINED_FOCUS;
-		e.focus.in_focus = true;
-		pushEvent(e);
+		//setFocus(true);
+		//e.type = EVENT_GAINED_FOCUS;
+		//e.focus.in_focus = true;
+		//pushEvent(e);
+		//propogate = is_parent;
+		if(is_parent)
+		{
+			setFocus(true);
+			result = 0;//DefWindowProc(hwnd, msg, wParam, lParam);
+		}
+		else
+		{
+			setFocus(false);
+			result = 0;
+		}
+		
 		break;
 
 	case WM_KILLFOCUS:
-		setFocus(false);
-		e.type = EVENT_LOST_FOCUS;
-		e.focus.in_focus = false;
-		pushEvent(e);
-		break;
+		//setFocus(false);
+		//e.type = EVENT_LOST_FOCUS;
+		//e.focus.in_focus = false;
+		//pushEvent(e);
+		/*
+		if(is_parent)
+		{
+			setFocus(false);
+			result = 0;//DefWindowProc(hwnd, msg, wParam, lParam);
+		}
+		else
+		{
+			setFocus(false);
+			result = 0;
+		}
 		*/
+		result = 0;
+		break;
 		
 	case WM_ACTIVATE:
-		setFocus(LOWORD(wParam) == WA_ACTIVE || LOWORD(wParam) == WA_CLICKACTIVE);
-		e.type = (inFocus) ? Events::GAINED_FOCUS : Events::LOST_FOCUS;
-		e.focus.in_focus = inFocus;
-		owner->handleEvent(e);
-		//pushEvent(e);
+		
+		if(is_parent)
+		{
+			//setFocus(LOWORD(wParam) == WA_ACTIVE || LOWORD(wParam) == WA_CLICKACTIVE);
+			//inFocus = LOWORD(wParam) == WA_ACTIVE || LOWORD(wParam) == WA_CLICKACTIVE;
+			//e.type = (inFocus) ? Events::GAINED_FOCUS : Events::LOST_FOCUS;
+			//e.focus.in_focus = inFocus;
+
+			//owner->handleEvent(e);
+			setFocus(LOWORD(wParam) == WA_ACTIVE || LOWORD(wParam) == WA_CLICKACTIVE);
+			result = 0;//DefWindowProc(hwnd, msg, wParam, lParam);
+		}
+		else
+		{
+			if(LOWORD(wParam) == WA_ACTIVE || LOWORD(wParam) == WA_CLICKACTIVE)
+			{
+				parentWindow->setFocus(true);
+				result = 0;
+			}
+			else
+				result = DefWindowProc(hwnd, msg, wParam, lParam);
+		}
+		
+		//result = 0;//DefWindowProc(hwnd, msg, wParam, lParam);
+		break;
+
+	case WM_MOUSEACTIVATE:
+		if(is_parent)
+		{
+			setFocus(true);
+			result = MA_ACTIVATE;
+		}
+		else
+		{
+			result = MA_NOACTIVATE;
+		}
+
+		break;
+
+	case WM_NCACTIVATE:
+		//if(wParam)
+		//{
+			result = DefWindowProc(hwnd, msg, wParam, lParam);
+		//}
+		//else
+		//{
+		//	result = TRUE;
+		//}
+		break;
+
+	case WM_CHILDACTIVATE:
+
+		//parentWindow->setFocus(true);
+
+		result = 0;
 		break;
 		
 	case WM_SIZE:
-		/*
-		winPos = getPosition();
-		currSize = Vec2i(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-		if(wParam != SIZE_MINIMIZED && (m_lastSize.x != currSize.x || m_lastSize.y != currSize.y))
-		{
-			//Update last size
-			m_lastSize = currSize;
-			//Push event
-			e.type = Events::RESIZED;
-			e.size.w = currSize.x;
-			e.size.h = currSize.y;
-			e.size.x = winPos.x;
-			e.size.y = winPos.y;
-			pushEvent(e);
-		}
-		*/
+		
+		//winPos = getPosition();
+		//currSize = Vec2i(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+		//if(wParam != SIZE_MINIMIZED && (m_lastSize.x != currSize.x || m_lastSize.y != currSize.y))
+		//{
+		//	//Update last size
+		//	m_lastSize = currSize;
+		//	//Push event
+		//	e.type = Events::RESIZED;
+		//	e.size.w = currSize.x;
+		//	e.size.h = currSize.y;
+		//	e.size.x = winPos.x;
+		//	e.size.y = winPos.y;
+		//	pushEvent(e);
+		//}
+		
 
 		if(wParam == SIZE_MAXIMIZED)
 			e.type = Events::MAXIMIZED;
@@ -361,13 +520,15 @@ void WindowWin32::processEvent(UINT msg, WPARAM wParam, LPARAM lParam)
 		//e.size.y = r.top;
 		//e.size.w = r.right - r.left;
 		//e.size.h = r.bottom - r.top;
-
 		owner->handleEvent(e);
 
+		result = 0;//DefWindowProc(hwnd, msg, wParam, lParam);
 		break;
 		
 	case WM_EXITSIZEMOVE:
+		result = DefWindowProc(hwnd, msg, wParam, lParam);
 		break;
+
 	case WM_SIZING:
 		//TODO: Use lParam values instead of re-getting size/position (need to convert rect from window to screen)
 		//AdjustWindowRect(*(LPRECT*)lParam, windowStyle, TRUE);
@@ -382,51 +543,85 @@ void WindowWin32::processEvent(UINT msg, WPARAM wParam, LPARAM lParam)
 		winPos = getPosition();//Point2i(r->left, r->top);
 		currSize = getSize();//Vec2i(r.right - r.left, r.bottom - r.top);
 		//Redraw window (if function provided)
-		if(resizeFunc) resizeFunc(winPos, currSize);
-		
 
+		result = DefWindowProc(hwnd, msg, wParam, lParam);
+		
+		//RedrawWindow(hwnd, (RECT*)lParam, NULL, RDW_INTERNALPAINT);
+		break;
+
+	case WM_MOVE:
+
+		result = DefWindowProc(hwnd, msg, wParam, lParam);
+		break;
+
+	case WM_MOVING:
+		//RedrawWindow(hwnd, (RECT*)lParam, NULL, RDW_INTERNALPAINT);
+		result = DefWindowProc(hwnd, msg, wParam, lParam);
 		break;
 
 	case WM_XBUTTONDOWN:
+		if(b == MB::NONE)
+			b = MB::X1;
 	case WM_LBUTTONDOWN:
+		if(b == MB::NONE)
+			b = MB::LEFT;
 	case WM_MBUTTONDOWN:
+		if(b == MB::NONE)
+			b = MB::MIDDLE;
 	case WM_RBUTTONDOWN:
-		SetCapture(m_handle);
+		if(b == MB::NONE)
+			b = MB::RIGHT;
+
+		//setFocus(true);
+		//SetCapture(hwnd);
 
 		e.type = Events::MOUSEBUTTON_DOWN;
-		e.mouseButton.button = convertWindowsMouseButton(wParam);
+		e.mouseButton.button = b;//convertWindowsMouseButton(wParam);
 
 		e.mouseButton.x = GET_X_LPARAM(lParam);
 		e.mouseButton.y = GET_Y_LPARAM(lParam);
 		owner->handleEvent(e);
 
-		//pushEvent(e);
+		result = 0;
+		//result = DefWindowProc(hwnd, msg, wParam, lParam);
 		break;
 		
 	case WM_XBUTTONUP:
 		//e.mouseButton.button = MB::X1;			//TODO: How to get which x button?
 		//btn_up_skip = true;
+		if(b == MB::NONE)
+			b = MB::X1;
 	case WM_LBUTTONUP:
 		//if(!btn_up_skip)
 		//	e.mouseButton.button = MB::LEFT;
 		//btn_up_skip = true;
+		if(b == MB::NONE)
+			b = MB::LEFT;
 	case WM_MBUTTONUP:
 		//if(!btn_up_skip)
 		//	e.mouseButton.button = MB::MIDDLE;
 		//btn_up_skip = true;
+		if(b == MB::NONE)
+			b = MB::MIDDLE;
 	case WM_RBUTTONUP:
 		//if(!btn_up_skip)
 		//	e.mouseButton.button = MB::RIGHT;
-		ReleaseCapture();
-		
+		if(b == MB::NONE)
+			b = MB::RIGHT;
+
+
+		//setFocus(true);
+		//ReleaseCapture();
+
 		e.type = Events::MOUSEBUTTON_UP;
-		e.mouseButton.button = convertWindowsMouseButton(wParam);
+		e.mouseButton.button = b;//convertWindowsMouseButton(wParam);
 
 		e.mouseButton.x = GET_X_LPARAM(lParam);
 		e.mouseButton.y = GET_Y_LPARAM(lParam);
 		owner->handleEvent(e);
 
-		//pushEvent(e);
+		result = 0;
+		//result = DefWindowProc(hwnd, msg, wParam, lParam);
 		break;
 
 	case WM_MOUSEMOVE:
@@ -436,10 +631,23 @@ void WindowWin32::processEvent(UINT msg, WPARAM wParam, LPARAM lParam)
 		e.mouseMove.y = GET_Y_LPARAM(lParam);
 
 		owner->handleEvent(e);
-		//pushEvent(e);
+
+		result = 0;
+		//result = DefWindowProc(hwnd, msg, wParam, lParam);
+		break;
+		
+	case WM_MOUSEHWHEEL:
+	case WM_HSCROLL:
+		//setFocus(true);
+		std::cout << "HORIZONTAL SCROLL!!!\n";
+
+		result = 0;
+		//result = DefWindowProc(hwnd, msg, wParam, lParam);
 		break;
 
 	case WM_MOUSEWHEEL:
+		//setFocus(true);
+
 		e.type = Events::MOUSEWHEEL_MOVED;
 		e.mouseWheel.delta_y = (float)GET_WHEEL_DELTA_WPARAM(wParam)/(float)WHEEL_DELTA;
 		e.mouseWheel.delta_x = 0.0f;
@@ -447,16 +655,11 @@ void WindowWin32::processEvent(UINT msg, WPARAM wParam, LPARAM lParam)
 		winPos = getClientPosition();
 		e.mouseWheel.x = GET_X_LPARAM(lParam) - winPos.x;
 		e.mouseWheel.y = GET_Y_LPARAM(lParam) - winPos.y;
-
-		//std::cout << e.mouseWheel.x << ", " << e.mouseWheel.y << "\n";
 		
 		owner->handleEvent(e);
-		//pushEvent(e);
-		break;
 
-	case WM_MOUSEHWHEEL:
-	case WM_HSCROLL:
-		std::cout << "HORIZONTAL SCROLL!!!\n";
+		result = 0;
+		//result = DefWindowProc(hwnd, msg, wParam, lParam);
 		break;
 
 	case WM_KEYDOWN:
@@ -467,7 +670,9 @@ void WindowWin32::processEvent(UINT msg, WPARAM wParam, LPARAM lParam)
 		e.key.shift = HIWORD(GetAsyncKeyState(VK_SHIFT)) != 0;
 		e.key.system = HIWORD(GetAsyncKeyState(VK_LWIN)) || HIWORD(GetAsyncKeyState(VK_RWIN));
 		owner->handleEvent(e);
-		//pushEvent(e);
+
+		result = 0;
+		//result = DefWindowProc(hwnd, msg, wParam, lParam);
 		break;
 
 	case WM_KEYUP:
@@ -478,27 +683,36 @@ void WindowWin32::processEvent(UINT msg, WPARAM wParam, LPARAM lParam)
 		e.key.shift = HIWORD(GetAsyncKeyState(VK_SHIFT)) != 0;
 		e.key.system = HIWORD(GetAsyncKeyState(VK_LWIN)) || HIWORD(GetAsyncKeyState(VK_RWIN));
 		owner->handleEvent(e);
-		//pushEvent(e);
+
+		result = 0;
+		//result = DefWindowProc(hwnd, msg, wParam, lParam);
 		break;
 
 	default:
+		//std::cout << std::hex << msg << "\n";
+		result = DefWindowProc(hwnd, msg, wParam, lParam);
 		break;
 	}
+	
+	
+	return result;
 }
 
 void WindowWin32::close()
 {
-	AU::safeDelete(context);
+	//if(context && context->
 }
 
+/*
 void WindowWin32::setResizeFunction(ResizeCallback resize_func)
 {
 	resizeFunc = resize_func;
 }
+*/
 
-void WindowWin32::swapBuffers()
+void WindowWin32::swapBuffers(HDC window)
 {
-	context->swapBuffers();
+	context->swapBuffers(window);
 }
 
 LRESULT CALLBACK WindowWin32::gEventCallback(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -518,22 +732,8 @@ LRESULT CALLBACK WindowWin32::gEventCallback(HWND hwnd, UINT msg, WPARAM wParam,
 	WindowWin32 *window = hwnd ? reinterpret_cast<WindowWin32*>(GetWindowLongPtr(hwnd, GWLP_USERDATA)) : nullptr;
 
 	//Call function for that window
-	if(window)
-		window->processEvent(msg, wParam, lParam);
-
-	//Make sure OS doesn't automatically close window
-	if(msg == WM_CLOSE)
-		return FALSE;
-
-	//Dont steal focus with alt or f10 (??)
-	if(msg == WM_SYSCOMMAND && wParam == SC_KEYMENU)
-		return FALSE;
-
-	//Dont erase background while resizing (prevents flickering)
-	if(msg == WM_ERASEBKGND)
-		return TRUE;
-
-	return DefWindowProc(hwnd, msg, wParam, lParam);
+	return window ? window->processEvent(hwnd, msg, wParam, lParam) : DefWindowProc(hwnd, msg, wParam, lParam);
+	//return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
 

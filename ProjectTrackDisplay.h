@@ -9,7 +9,7 @@
 
 class Cursor;
 
-class AudioTrackNode;
+class AudioBufferNode;
 //class CollapseList;
 class AudioTrackControl;
 class MidiTrackControl;
@@ -17,7 +17,7 @@ class MidiTrackControl;
 class ProjectTrackDisplay : public ScrollArea
 {
 protected:
-	std::vector<AudioTrackNode*>	trackNodes;
+	std::vector<AudioBufferNode*>	trackNodes;
 	std::vector<AudioTrackControl*> audioTrackControls;
 	std::vector<MidiTrackControl*>	midiTrackControls;
 
@@ -48,8 +48,8 @@ public:
 								SAMPLES_PER_PIXEL,
 								CURSOR_FOLLOW_OFFSET;
 	
-	void addTrack(AudioTrackNode *atn);
-	void removeTrack(AudioTrackNode *atn);
+	void addTrack(AudioBufferNode *atn);
+	void removeTrack(AudioBufferNode *atn);
 
 	bool isPlaying() const;
 	void play();
@@ -60,7 +60,7 @@ public:
 
 	void updateCursorPos();
 
-	//virtual void update(double dt) override;
+	//virtual void update(const Time &dt) override;
 
 	virtual void draw(GlInterface &gl) override;
 };

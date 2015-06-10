@@ -2,12 +2,16 @@
 #define APOLLO_NODE_GRAPH_H
 
 //Include all Node resources
-#include "Node.h"
+#include "Vector.h"
+#include "NodeResources.h"
+#include "Timing.h"
 
 #include <vector>
 #include <unordered_set>
 #include <unordered_map>
+#include <memory>
 
+class Node;
 class NodeConnector;
 class ProjectTrackDisplay;
 
@@ -67,31 +71,46 @@ class NodeGraph
 private:
 	//static std::vector<Point2f> presetPositions[static_cast<unsigned int>(NodeGraphPreset::COUNT)];
 
-	std::unordered_map<Node*, Point2f>		nodes;
-	std::unordered_set<COwnedPtr>			nodeConnections;
+	//Map --> Node id to node UNIQUE ptr
+	std::unordered_map<NID, std::unique_ptr<Node>>				nodes;
+	//Set of connections between nodes
+	std::unordered_map<CID, std::unique_ptr<NodeConnection>>	connections;
 	
-
+	Node* getNode(NID id);
+	
 public:
 	NodeGraph();
-	NodeGraph(const std::unordered_map<Node*, Point2f> &g_nodes);
+	NodeGraph(std::unordered_map<Node*, Point2f> &g_nodes, std::unordered_set<NodeConnection*> g_connections);
 	~NodeGraph();
-	
-	void addConnection(COwnedPtr nc);
-	void removeConnection(COwnedPtr nc);
 
 	void addNode(Node *n, Point2f g_pos);
-	void removeNode(Node *n);
+	bool removeNode(NID id);
+	
+	//Creates a new connection between the specified nodes
+	//bool connectNodes(NID n1, NID n2);
+	//bool connectNodes(Node& n1, Node& n2);
 
-	const std::unordered_map<Node*, Point2f>* getNodes();
-	//const std::vector<Point2f>& getInitialPos();
+	//Creates a new connection between the specified nodeconnectors. Returns pointer to created connection.
+	NodeConnection* makeNewConnection(NCID n1, NCID n2);
+	NodeConnection* makeNewConnection(NCID nc);
+	bool removeConnection(CID id);
+
+	const std::unordered_map<NID, Node*> getNodes();
+	const std::unordered_map<CID, NodeConnection*> getConnections();
+	
+	unsigned int getNumNodes() const;
+	unsigned int getNumConnections() const;
+
 	//NodeTree* getNodeTree();
 
-	unsigned int numNodes();
-
-	void reset();
+	void resetGraph();
 	void setPreset(NodeGraphPreset preset, int sample_rate);
 
-	void update(double dt);
+	void update(const Time &dt);
+	void resetConnectionStates();
+
+	//Stops all threads that are running on nodes' devices
+	void stopAllDevices();
 
 	friend class NodeConnector;
 };

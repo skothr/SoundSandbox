@@ -5,9 +5,12 @@
 #include <GL/glew.h>
 #include <vector>
 
+class ShaderProgram;
+
 class GlContext
 {
 private:
+	//TODO: Go back to using multiple contexts (????)
 	static std::vector<GlContext*> contexts;
 	static int activeIndex;
 
@@ -18,20 +21,22 @@ private:
 	HPALETTE m_hPalette = nullptr;
 	HWND m_hWnd = nullptr;
 
-	void setUpPixelFormat();
 	void setUpPalette();
 
 public:
+
 	GlContext();
-	~GlContext();
+	virtual ~GlContext();
+	
+	void setUpPixelFormat(HDC dc);
 
 	//static void setActiveContext(GlContext *c);
 
 	void init(HWND hwnd);
-	void setActive();
-	void swapBuffers();
+	void setActive(HDC window);
+	void swapBuffers(HDC window);
 
-	bool isActive();
+	bool isActive(HDC window);
 };
 
 

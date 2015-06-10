@@ -1,6 +1,7 @@
 #include "NodeConnectionControl.h"
 
 #include "Node.h"
+#include "NodeConnection.h"
 #include "NodeGraphControl.h"
 #include "NodeControl.h"
 
@@ -25,7 +26,7 @@ const Color			NodeConnectionControl::INACTIVE_COLOR = Color(1.0f, 1.0f, 1.0f, 1.
 					NodeConnectionControl::ARROW_COLOR = Color(1.5f, 1.5f, 0.0f, 1.0f);				//Color of the connection arrow when active
 
 
-NodeConnectionControl::NodeConnectionControl(NodeGraphControl *parent_, GuiStateFlags s_flags, COwnedPtr nc)
+NodeConnectionControl::NodeConnectionControl(NodeGraphControl *parent_, GuiStateFlags s_flags, NodeConnection *nc)
 	: GuiElement(parent_, APoint(), AVec(), GuiProps(s_flags, PROP_FLAGS)),
 		Control(GuiProps(s_flags, PROP_FLAGS)),
 		ngc_parent(parent_), NC(nc)
@@ -39,13 +40,13 @@ NodeConnectionControl::NodeConnectionControl(NodeGraphControl *parent_, GuiState
 	setBgStateColor(Color(1.0f, 1.0f, 1.0f, 1.0f), CS::DRAGGING);
 	setBgStateColor(Color(1.0f, 1.0f, 1.0f, 1.0f), CS::DROP_HOVERING);
 	//setAllBgStateColors(Color(1.0f, 0.0f, 1.0f, 1.0f));
-	
-	fromNodeControl = (NC->fromNc ? ngc_parent->getNodeControl(NC->fromNc->getNode()) : nullptr);
-	toNodeControl = (NC->toNc ? ngc_parent->getNodeControl(NC->toNc->getNode()) : nullptr);
 
-	fromPoint = (fromNodeControl ? fromNodeControl->getConnectorPoint(NC->fromNc->ioType) : APoint(0.0f, 0.0f));
-	toPoint = (toNodeControl ? toNodeControl->getConnectorPoint(NC->toNc->ioType) : fromPoint);
-	fromPoint = (fromNodeControl ? fromPoint : toPoint);
+	fromNodeControl = (NC->fromIsConnected() ? &ngc_parent->getNodeControl(NC->fromNode->getId()) : nullptr);
+	toNodeControl = (NC->toIsConnected() ? &ngc_parent->getNodeControl(NC->toNode->getId()) : nullptr);
+
+	fromPoint = (NC->fromIsConnected() ? fromNodeControl->getConnectorPoint(NC->fromNc->ioType) : APoint(0.0f, 0.0f));
+	toPoint = (NC->toIsConnected() ? toNodeControl->getConnectorPoint(NC->toNc->ioType) : fromPoint);
+	fromPoint = (NC->fromIsConnected() ? fromPoint : toPoint);
 
 	adjustPos();
 }
@@ -60,7 +61,7 @@ void NodeConnectionControl::onDrag(APoint m_pos, AVec d_pos, bool direct)
 	APoint a_m_pos = m_pos + pos;//ngc_parent->transform.absoluteToVirtualPoint(m_pos);
 	float dist = distanceToLine(m_pos);
 
-	if(NC->isConnected())
+	if(NC->isConnected() && direct && clickSelect)
 	{
 		if(dist > disconnectDist || !pointInside(a_m_pos))
 		{
@@ -69,28 +70,34 @@ void NodeConnectionControl::onDrag(APoint m_pos, AVec d_pos, bool direct)
 			float	from_dist_2 = d_p_from.x*d_p_from.x + d_p_from.y*d_p_from.y,
 					to_dist_2 = d_p_to.x*d_p_to.x + d_p_to.y*d_p_to.y;
 
-			bool d = NC->fromNc->disconnect(NC->toId);
+			//bool d = NC->disconnectHalf((to_dist_2 < from_dist_2) ? NC->toId : NC->fromId);
+			bool d = NC->disconnectFrom((to_dist_2 < from_dist_2) ? NC->toId : NC->fromId);
+
+			if(d)
+				std::cout << "SUCCESSFULLY DISCONNECTED NODES!\n";
+			else
+				std::cout << "FAILED TO DISCONNECT NODES!\n";
 
 			ngc_parent->movingConnection = this;
 
-			std::cout << to_dist_2 << ", " << from_dist_2 << "\n";
+			//std::cout << to_dist_2 << ", " << from_dist_2 << "\n";
 
-			if(to_dist_2 < from_dist_2)
-			{
-				NC->toId = -1;
-				NC->toNode = nullptr;
-				NC->toNc = nullptr;
-				toNodeControl = nullptr;
-			}
-			else
-			{
-				NC->fromId = -1;
-				NC->fromNode = nullptr;
-				NC->fromNc = nullptr;
-				fromNodeControl = nullptr;
-			}
+			//if(to_dist_2 < from_dist_2)
+			//{
+			//	NC->toId = -1;
+			//	NC->toNode = nullptr;
+			//	NC->toNc = nullptr;
+			//	toNodeControl = nullptr;
+			//}
+			//else
+			//{
+			//	NC->fromId = -1;
+			//	NC->fromNode = nullptr;
+			//	NC->fromNc = nullptr;
+			//	fromNodeControl = nullptr;
+			//}
 
-			ngc_parent->updateGraph();
+			//ngc_parent->updateGraph();
 		}
 	}
 	
@@ -133,6 +140,7 @@ float NodeConnectionControl::distanceToLine(APoint p)
 								: activeDist + 10000.0f;
 }
 
+
 void NodeConnectionControl::setHangingNode(NodeConnector *other_nc)
 {
 	setHangingNode(other_nc->getId());
@@ -140,55 +148,78 @@ void NodeConnectionControl::setHangingNode(NodeConnector *other_nc)
 
 void NodeConnectionControl::setHangingNode(NCID other_id)
 {
-	if(!NC->toNode && NC->fromNode)
+	/*
+	if(NC->toIsConnected() && !NC->fromIsConnected())
 	{
-		NC->toId = other_id;
-		NC->toNc = NodeConnector::getNC(other_id);
-		toNodeControl = ngc_parent->getNodeControl(NC->toNc->getNode());
+		toNodeControl = ngc_parent->getNodeControl(NC->toNode);
 		toPoint = toNodeControl->getConnectorPoint(NC->toNc->ioType);
 	}
-	else if(NC->toNode && !NC->fromNode)
+	else if(!NC->toIsConnected() && NC->fromIsConnected())
 	{
-		NC->fromId = other_id;
-		NC->fromNc = NodeConnector::getNC(other_id);
-		fromNodeControl = ngc_parent->getNodeControl(NC->fromNc->getNode());
+		fromNodeControl = ngc_parent->getNodeControl(NC->fromNode);
 		fromPoint = fromNodeControl->getConnectorPoint(NC->fromNc->ioType);
 	}
 	else
 		std::cout << "ERROR: Node control set other node!\n";
+		
+	
+	fromNodeControl = (NC->fromIsConnected() ? ngc_parent->getNodeControl(NC->fromNode) : nullptr);
+	toNodeControl = (NC->toIsConnected() ? ngc_parent->getNodeControl(NC->toNode) : nullptr);
+	*/
+
+	if(NC->isHanging())	//If one is connected and the other isnt
+	{
+		NC->connectTo(other_id);
+		
+		fromNodeControl = (NC->fromIsConnected() ? &ngc_parent->getNodeControl(NC->fromNode->getId()) : nullptr);
+		toNodeControl = (NC->toIsConnected() ? &ngc_parent->getNodeControl(NC->toNode->getId()) : nullptr);
+
+		fromPoint = fromNodeControl->getConnectorPoint(NC->fromNc->ioType);
+		toPoint = toNodeControl->getConnectorPoint(NC->toNc->ioType);
+	}
 
 	adjustPos();
 }
 
+
 void NodeConnectionControl::setHangingPos(APoint h_pos)
 {
-	if(!NC->toNode && NC->fromNode)
+	if(!NC->toIsConnected() && NC->fromIsConnected())
 		toPoint = h_pos;
-	else if(NC->toNode && !NC->fromNode)
+	else if(NC->toIsConnected() && !NC->fromIsConnected())
 		fromPoint = h_pos;
 
 	adjustPos();
 }
 
+NodeConnector* NodeConnectionControl::getHangingNode()
+{
+	if(!NC->toIsConnected() && NC->fromIsConnected())
+		return NC->fromNc;
+	else if(NC->toIsConnected() && !NC->fromIsConnected())
+		return NC->toNc;
+}
+
 
 bool NodeConnectionControl::fromConnected() const
 {
-	return (bool)NC->fromNode;
+	return NC->fromIsConnected();
 }
 
 bool NodeConnectionControl::toConnected() const
 {
-	return (bool)NC->toNode;
+	return NC->toIsConnected();
 }
 
-void NodeConnectionControl::update(double dt)
+void NodeConnectionControl::update(const Time &dt)
 {
 	Control::update(dt);
 
 	if(NC->isConnected())
 	{
-		bool	forward = valid(NC->getActiveDir() & NCDir::FORWARD),
-				backward = valid(NC->getActiveDir() & NCDir::BACKWARD);
+		NCDir	active_dir = NC->getActiveDir();
+		bool	forward = valid(active_dir & NCDir::FORWARD),
+				backward = valid(active_dir & NCDir::BACKWARD);
 
 		f_trans_time += (forward ? 1.0 : -1.0)*dt;
 		f_trans_time = min(f_trans_time, TRANSITION_TIME);
@@ -204,6 +235,11 @@ void NodeConnectionControl::update(double dt)
 		
 		//Calculate connection amplitude
 		amplitude = smootherInterp(0.0f, 1.0f, max(f_trans_time, b_trans_time)*(1.0f/TRANSITION_TIME));
+		
+		pushing = NC->isPushing();
+		pulling = NC->isPulling();
+
+		//NC->resetConnectionStates();
 	}
 
 }
@@ -212,8 +248,8 @@ void NodeConnectionControl::draw(GlInterface &gl)
 {
 	if(visible)
 	{
-		fromPoint = (NC->fromNc && fromNodeControl ? fromNodeControl->getConnectorPoint(NC->fromNc->ioType) : fromPoint);
-		toPoint = (NC->toNc && toNodeControl ? toNodeControl->getConnectorPoint(NC->toNc->ioType) : toPoint);
+		fromPoint = (NC->fromIsConnected() && fromNodeControl ? fromNodeControl->getConnectorPoint(NC->fromNc->ioType) : fromPoint);
+		toPoint = (NC->toIsConnected() && toNodeControl ? toNodeControl->getConnectorPoint(NC->toNc->ioType) : toPoint);
 
 		APoint	f_p = fromPoint - pos,//ngc_parent->transform.absoluteToVirtualPoint(fromPoint),
 				t_p = toPoint - pos;//ngc_parent->transform.absoluteToVirtualPoint(toPoint);
@@ -269,6 +305,14 @@ void NodeConnectionControl::draw(GlInterface &gl)
 		gl.drawShape(GL_LINES, t_points);
 		t_points.clear();
 		t_points.reserve(3);
+		
+		//Draw pushing/pulling lines
+		gl.setColor(Color(1.0f, 0.0f, 0.0f, 1.0f));
+		APoint half = (fromPoint + toPoint)*0.5f;
+		if(pushing)
+			gl.drawLine(fromPoint, half);
+		if(pulling)
+			gl.drawLine(half, toPoint);
 
 		t_points.push_back(TVertex(start + step*(length - ARROW_LENGTH) - perp*baseHeight*2.0f, col));
 		t_points.push_back(TVertex(start + step*(length - ARROW_LENGTH) + perp*baseHeight*2.0f, col));

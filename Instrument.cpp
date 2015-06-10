@@ -1,6 +1,5 @@
 #include "Instrument.h"
 
-#include "Sampling.h"
 #include <exception>
 
 /////INSTRUMENT/////
@@ -34,11 +33,13 @@ WaveSynth::WaveSynth(Time attack_time, Time decay_time, Time sustain_level, Time
 	setUpSampling();
 }
 
+/*
 WaveSynth::WaveSynth(const WaveSynthDesc &ws_desc)
 	: WaveSynth(ws_desc.attackTime, ws_desc.decayTime, ws_desc.sustainLevel, ws_desc.releaseTime, ws_desc.interp)
 {
 	waveform = Waveform(ws_desc.waveform);
 }
+*/
 
 void WaveSynth::setUpSampling()
 {
@@ -324,6 +325,7 @@ InstrumentType WaveSynth::getType() const
 	return InstrumentType::WAVESYNTH;
 }
 
+/*
 void WaveSynth::updateDesc()
 {
 	objDesc = (objDesc ? objDesc : (ObjDesc*)(new WaveSynthDesc()));
@@ -339,3 +341,4 @@ void WaveSynth::updateDesc()
 	desc->sustainLevel = sustainLevel;
 	desc->releaseTime = releaseTime;
 }
+*/

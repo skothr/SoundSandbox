@@ -10,7 +10,7 @@
 #include "Instrument.h"
 
 #include "AudioChunk.h"
-
+/*
 /////SAVEABLE/////
 
 //Saveable::Saveable(const ObjDesc &obj_desc)
@@ -574,3 +574,4 @@ int SpeakerNDesc::readFromFile(std::ifstream &in)
 
 	return n_bytes;
 }
+*/

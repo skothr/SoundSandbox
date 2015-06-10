@@ -4,11 +4,11 @@
 #include "GuiElement.h"
 #include "GuiGroup.h"
 
+class Window;
+
 class ParentElement : public virtual GuiElement
 {
 protected:
-	ParentElement();	//Default constructor for virtual inheritance
-
 	GuiGroup	bodyChildren,		//Body children of this element -- transformed into this element's
 									//	virtual space
 				floatingChildren;	//Children that float on top of this element -- not transformed,
@@ -22,6 +22,8 @@ protected:
 	virtual void onAddElement()		{ }
 
 	virtual void drawChildren(GlInterface &gl);//, bool transform_body = true);
+	
+	ParentElement();	//Default constructor for virtual inheritance
 
 public:
 	virtual ~ParentElement();
@@ -33,7 +35,7 @@ public:
 
 	virtual bool isolateViewport(GlInterface &gl, bool clamp = true) override;
 
-	virtual void update(double dt) override;
+	virtual void update(const Time &dt) override;
 	virtual void draw(GlInterface &gl) override;
 
 	friend class GuiElement;

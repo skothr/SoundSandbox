@@ -12,7 +12,7 @@ Area::~Area()
 { }
 
 
-void Area::update(double dt)
+void Area::update(const Time &dt)
 {
 	Container::update(dt);
 }

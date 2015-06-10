@@ -4,44 +4,58 @@
 #include "Interpolation.h"
 
 #include <algorithm>
+#include <fstream>
+
+#include "FileSystem.h"
+#include "Path.h"
 
 
 /////AUDIO DATA/////
+
 AudioData::AudioData(s_time chunk_size)
 	: chunkSize(chunk_size)
 { }
 
 AudioData::~AudioData()
-{
-
-}
+{ }
 
 s_time AudioData::getChunkSize() const
 {
 	return chunkSize;
 }
+/*
+ChunkType* AudioData::operator[](c_time c_index)
+{
+	return data[c_index];
+}
 
+const ChunkType* AudioData::operator[](c_time c_index) const
+{
+	return data[c_index];
+}
+
+ChunkType& AudioData::operator()(c_time c_index)
+{
+	return *data[c_index];
+}
+
+const ChunkType& AudioData::operator()(c_time c_index) const
+{
+	return *data[c_index];
+}
+*/
 /////AUDIO AMP DATA/////
 
 AudioAmpData::AudioAmpData(s_time chunk_size, c_time num_chunks)
-	: AudioData(chunk_size),
-		data(num_chunks, nullptr)
+	: AudioData(chunk_size), data(num_chunks, nullptr)
 {
 	for(auto &d : data)
 		d = new AudioAmpChunk(chunk_size);
 }
 
 AudioAmpData::~AudioAmpData()
-{
-	for(auto d : data)
-		if(d) delete d;
-	data.clear();
-}
+{ }
 
-AudioAmpChunk* AudioAmpData::getChunk(c_time c_index)
-{
-	return data[c_index];
-}
 
 c_time AudioAmpData::getNumChunks() const
 {
@@ -52,12 +66,6 @@ std::vector<AudioAmpChunk*>* AudioAmpData::getData()
 {
 	return &data;
 }
-
-DataStatus AudioAmpData::getChunkStatus(c_time c_index) const
-{
-	return data[c_index]->getStatus();
-}
-
 
 void AudioAmpData::loadZeros()
 {
@@ -74,7 +82,6 @@ void AudioAmpData::resize(c_time new_num_chunks)
 		{
 			if(data[c])
 				delete data[c];
-			data[c] = nullptr;
 		}
 		//Resize
 		data.resize(new_num_chunks);
@@ -168,6 +175,69 @@ AudioAmpData& AudioAmpData::operator=(const AudioAmpData &other)
 }
 
 
+//Square brackets return chunk pointer at c_index
+AudioAmpChunk* AudioAmpData::operator[](c_time c_index)
+{
+	return data[c_index];
+}
+
+const AudioAmpChunk* AudioAmpData::operator[](c_time c_index) const
+{
+	return data[c_index];
+}
+
+//Parentheses return chunk reference at c_index
+AudioAmpChunk& AudioAmpData::operator()(c_time c_index)
+{
+	return *data[c_index];
+}
+
+const AudioAmpChunk& AudioAmpData::operator()(c_time c_index) const
+{
+	return *data[c_index];
+}
+
+
+void AudioAmpData::writeToFile(const Path &file_path)
+{
+	std::ofstream out(file_path.getSystem(), std::ofstream::out);
+
+	for(c_time c = 0; c < data.size(); c++)
+	{
+		AudioAmpChunk &curr_chunk = *data[c];
+		for(s_time s = 0; s < chunkSize; s++)
+		{
+			FileSystem::writeFile(out, curr_chunk[s]);
+		}
+	}
+
+	out.close();
+}
+
+void AudioAmpData::readFromFile(const Path &file_path)
+{
+	data.clear();
+
+	std::ifstream in(file_path.getSystem(), std::ifstream::in);
+	//TODO: Store chunk size, etc. in file header
+
+	while(!in.eof())
+	{
+		for(c_time c = 0; !in.eof(); c++)
+		{
+			AudioAmpChunk *curr_chunk = new AudioAmpChunk(chunkSize);
+			data.push_back(curr_chunk);
+
+			for(s_time s = 0; s < chunkSize && !in.eof(); s++)
+			{
+				FileSystem::readFile(in, (*curr_chunk)[s]);
+			}
+		}
+	}
+
+	in.close();
+}
+
 
 /////AUDIO VEL DATA/////
 
@@ -179,16 +249,19 @@ AudioVelData::AudioVelData(s_time chunk_size, c_time num_chunks, AudioSample pri
 		d = new AudioVelChunk(chunk_size, seed);
 }
 
+AudioVelData::AudioVelData(const AudioVelData &other)
+	: AudioData(other.chunkSize),
+		data(other.chunkSize, nullptr), seed(other.seed)
+{
+	for(int i = 0; i < chunkSize; i++)
+		data[i] = new AudioVelChunk(*other.data[i]);
+}
+
 AudioVelData::~AudioVelData()
 {
 	for(auto d : data)
 		if(d) delete d;
 	data.clear();
-}
-
-AudioVelChunk* AudioVelData::getChunk(c_time c_index)
-{
-	return data[c_index];
 }
 
 c_time AudioVelData::getNumChunks() const
@@ -199,11 +272,6 @@ c_time AudioVelData::getNumChunks() const
 std::vector<AudioVelChunk*>* AudioVelData::getData()
 {
 	return &data;
-}
-
-DataStatus AudioVelData::getChunkStatus(c_time c_index) const
-{
-	return data[c_index]->getStatus();
 }
 
 AudioSample AudioVelData::getSeed() const
@@ -368,4 +436,73 @@ AudioVelData& AudioVelData::operator=(const AudioVelData &other)
 		data[c] = new AudioVelChunk(*other.data[c]);
 
 	return *this;
+}
+
+
+//Square brackets return chunk pointer at c_index
+AudioVelChunk* AudioVelData::operator[](c_time c_index)
+{
+	return data[c_index];
+}
+
+const AudioVelChunk* AudioVelData::operator[](c_time c_index) const
+{
+	return data[c_index];
+}
+
+//Parentheses return chunk reference at c_index
+AudioVelChunk& AudioVelData::operator()(c_time c_index)
+{
+	return *data[c_index];
+}
+
+const AudioVelChunk& AudioVelData::operator()(c_time c_index) const
+{
+	return *data[c_index];
+}
+
+
+void AudioVelData::writeToFile(const Path &file_path)
+{
+	std::ofstream out(file_path.getSystem(), std::ofstream::out);
+
+	for(c_time c = 0; c < data.size(); c++)
+	{
+		AudioVelChunk &curr_chunk = *data[c];
+		for(s_time s = 0; s < chunkSize; s++)
+		{
+			FileSystem::writeFile(out, curr_chunk[s]);
+		}
+	}
+
+	out.close();
+}
+
+void AudioVelData::readFromFile(const Path &file_path)
+{
+	data.clear();
+
+	std::ifstream in(file_path.getSystem(), std::ifstream::in);
+	//TODO: Store chunk size, etc. in file header
+
+	AudioSample last_seed = 0;	//TODO: Store seed with vel data
+
+	while(!in.eof())
+	{
+		for(c_time c = 0; !in.eof(); c++)
+		{
+			AudioVelChunk *curr_chunk = new AudioVelChunk(chunkSize, last_seed);
+			data.push_back(curr_chunk);
+
+			for(s_time s = 0; s < chunkSize && !in.eof(); s++)
+			{
+				FileSystem::readFile(in, (*curr_chunk)[s]);
+			}
+
+			data[c]->updateChunkStep();
+			last_seed += data[c]->chunkStep;
+		}
+	}
+
+	in.close();
 }

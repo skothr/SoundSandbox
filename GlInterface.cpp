@@ -2,6 +2,8 @@
 
 #include <GL/glew.h>
 
+#include "WindowWin32.h"
+
 
 /////GUI SPACE/////
 
@@ -31,6 +33,8 @@ TVertex::TVertex(const APoint &p, const Color &c)
 
                    
 /////GL INTERFACE/////
+//ShaderProgram *GlInterface::textSP = nullptr;
+//GLuint GlInterface::text_vbID = 0;
 
 GlInterface::GlInterface(const ViewRect &base_view)
 	: baseView(base_view)
@@ -42,6 +46,7 @@ GlInterface::GlInterface(const ViewRect &base_view)
 
 	setViewport(base_view);
 }
+
 
 Vec3f GlInterface::currToView(const Vec3f &v) const
 {
@@ -218,6 +223,11 @@ void GlInterface::restoreLast()
 	
 	setViewport(spaceStack.top().view);
 }
+
+//void GlInterface::setWindow(WindowWin32 *gl_window)
+//{
+//	wglMakeCurrent(gl_window->getHandle(), ;
+//}
 
 
 

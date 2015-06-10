@@ -3,11 +3,11 @@
 
 #include "Screen.h"
 
-ShaderProgram *Texture::texSP;
+ShaderProgram *Texture::texSP = nullptr;
 GLuint Texture::vbID = 0;
 
 Texture::Texture()
-	: texID(0), fbID(0), size(10.0f, 10.0f)
+	: size(10.0f, 10.0f)
 {
 
 }
@@ -18,17 +18,16 @@ Texture::~Texture()
 		glDeleteTextures(1, &texID);
 	texID = 0;
 
-	if(fbID)
+	if(fbID)// && glCheckFramebufferStatus(fbID) == GL_FRAMEBUFFER_COMPLETE)
 		glDeleteFramebuffers(1, &fbID);
 	fbID = 0;
 }
-
 
 void Texture::create(AVec a_size, void *data)
 {
 	size = a_size;
 
-	if(!texID)
+	if(!texID && !fbID)
 	{
 		//Create texture
 		glGenTextures(1, &texID);
@@ -103,6 +102,8 @@ void Texture::draw(Point2f pos, Vec2f size, Vec2i view_size)
 	Point2f glPos = toGlPoint(pos, view_size);
 	Vec2f glSize = toGlVec(size, view_size);
 
+	//glSize.y = abs(glSize.y);
+
 	bind(this);
 	
 	//Load vertex array
@@ -155,12 +156,18 @@ void Texture::loadResources()
 	glBindBuffer(GL_ARRAY_BUFFER, NULL);
 }
 
-void Texture::cleanUp()
+void Texture::cleanup()
 {
 	if(vbID)
 	{
 		glDeleteBuffers(1, &vbID);
 		vbID = 0;
+	}
+
+	if(texSP)
+	{
+		delete texSP;
+		texSP = nullptr;
 	}
 }
 

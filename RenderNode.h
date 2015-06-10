@@ -1,8 +1,8 @@
 #ifndef APOLLO_RENDER_NODE_H
 #define APOLLO_RENDER_NODE_H
 
-#include "AStatus.h"
 #include <vector>
+#include <unordered_set>
 
 #include "Node.h"
 
@@ -14,6 +14,7 @@
 #include "Timing.h"
 #include "MIDI.h"
 #include "Sampling.h"
+#include "MidiData.h"
 
 #include <unordered_map>
 #include <unordered_set>
@@ -23,6 +24,7 @@
 #define RENDER_BUFFER_SIZE 5
 
 class Waveform;
+class MidiData;
 
 //A list of none/one/multiple SampleStates for each MidiIndex.
 typedef std::unordered_multimap<MidiIndex, SampleState> StateMultiMap;
@@ -43,20 +45,31 @@ public:
 	std::vector<SampleModFunction>				mods;
 
 	MidiTracker(int sample_rate);
-	~MidiTracker() = default;
+	~MidiTracker();
 };
 
 //A node that can render midi data into audio data.
-class RenderNode : public virtual Node
+class RenderNode : public Node
 {
 private:
 	static const std::vector<NodeConnectorDesc> nc_descs;
 	void initNode();
 
+	bool pushedThisChunk = false;
+
+	Time	renderTime = 0.0,	//Time that this node has rendered up to (Global time)
+				chunkStart = 0.0;	//Time that the current active chunk started (Global time)
+
 protected:
+
+	static std::unordered_set<RenderNode*> renderNodes;
+	static void renderNodeFlush();
+
 	//Buffer for building up audio to push
 	AudioVelDataBuffer						renderBuffer;
-	AudioVelChunk							*activeChunk = nullptr;
+	AudioVelChunk							*activeChunk = nullptr,
+											*lastActiveChunk = nullptr;
+	bool									zeroChunk = true;
 
 	//Holds trackers for each connection
 	std::unordered_map<NCID, MidiTracker*>	pullTrackers,	//Trackers for when pulling data
@@ -68,8 +81,11 @@ protected:
 	void addMidiEvents(MidiEventQueue &e_q, const MidiEventQueue &src);
 
 	//	NOT THREAD SAFE! Node should be locked before calling these functions
-	void updateEvents(const MidiData &notes, TimeRange range, NCID connector, NCDir dir);
-	void updateEvents(const MidiEventQueue &e_q, NCID connector, NCDir dir);
+	//void updateEvents(const MidiData &notes, TimeRange range, NCID connector, NCDir dir);
+	//void updateEvents(const MidiEventQueue &e_q, NCID connector, NCDir dir);
+
+	void pushEvent(MidiEvent e, NCID connector);
+	void addPulledEvents(const MidiSet &notes, TimeRange t_range, NCID connector);
 
 	void shiftBuffer();
 
@@ -77,13 +93,18 @@ protected:
 	//	NOT THREAD SAFE! Node should be locked before calling this function
 	//	offset --> offset from beginning of track to current time (only used for pulling data)
 	//bool render(NoteSampleFunction &sample, const TimeRange &t_range, const ChunkRange &c_range, AudioVelChunk **output_data, TransferMethod method, NCDir dir);
-	bool render(NoteSampleFunction &sample, AudioVelChunk **chunk, const TimeRange &t_range, const ChunkRange &c_range, TransferMethod method, NCDir dir);
+	bool render(NoteSampleFunction &sample, AudioVelChunk *chunk, TimeRange g_range, TransferMethod method, bool flush);
+
+	//Renders pushed audio up the the given global time.
+	bool renderUpTo(NoteSampleFunction &sample, Time g_time);
+
+	//bool pushRender(NoteSampleFunction &sample, AudioVelChunk *chunk, TimeRange g_range, TransferMethod method);
 
 	int sampleRate = 0;
 
 public:
-	RenderNode(int sample_rate);
-	RenderNode(const RenderNDesc &rn_desc);
+	RenderNode(NodeGraph *parent_graph, int sample_rate);
+	//RenderNode(const RenderNDesc &rn_desc);
 	virtual ~RenderNode();
 	
 	//Connector ids
@@ -109,13 +130,18 @@ public:
 
 	const AudioVelDataBuffer* getBuffer();
 
-	virtual bool flushData(FlushPacket &info) override;
+	//virtual bool flushData(FlushPacket &info) override;
 
-	virtual bool pullData(PullPacket &output, NCID this_id) override;
-	virtual bool pushData(PushPacket &input, NCID this_id) override;
+	virtual bool pullData(PullPacket &output, NCID this_id, NCID other_id) override;
+	virtual bool pushData(PushPacket &input, NCID this_id, NCID other_id) override;
+	
+	void flushEvents();
 	
 protected:
-	virtual void updateDesc() override;
+	//virtual void updateDesc() override;
+
+	//TEMP (only for cursor stuff)
+	friend class SpeakerNode;
 };
 
 

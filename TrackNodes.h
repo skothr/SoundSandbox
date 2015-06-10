@@ -1,6 +1,7 @@
 #ifndef APOLLO_TRACK_NODE_H
 #define APOLLO_TRACK_NODE_H
-
+/*
+#include "Node.h"
 #include "NodeBaseTypes.h"
 #include "Timing.h"
 #include "MIDI.h"
@@ -9,9 +10,6 @@
 #include "Audio.h"
 #include "AudioChunk.h"
 #include "AudioData.h"
-
-#include <mutex>
-
 
 class MidiTrackNode;
 class ProjectTrackDisplay;
@@ -54,8 +52,8 @@ protected:
 	ProjectTrackDisplay *display = nullptr;
 
 public:
-	AudioTrackNode(int sample_rate, c_time track_length = 0);
-	AudioTrackNode(const AudioTrackNDesc &atn_desc);
+	AudioTrackNode(NodeGraph *parent_graph, int sample_rate, c_time track_length = 0);
+	//AudioTrackNode(NodeGraph *parent_graph, const AudioTrackNDesc &atn_desc);
 	virtual ~AudioTrackNode();
 	
 	//Connector indices
@@ -82,7 +80,7 @@ public:
 
 	virtual void clearRange(ChunkRange r, bool compress) override;
 
-	virtual void onUpdate(double dt) override;
+	virtual void onUpdate(const Time &dt) override;
 
 	//virtual AStatus setDirty(ChunkRange r) override;
 	//
@@ -92,13 +90,13 @@ public:
 
 	//void setDisplay(ProjectTrackDisplay *new_display);
 	
-	virtual bool pullData(PullPacket &output, NCID this_id) override;
-	virtual bool pushData(PushPacket &input, NCID this_id) override;
+	virtual bool pullData(PullPacket &output, NCID this_id, NCID other_id) override;
+	virtual bool pushData(PushPacket &input, NCID this_id, NCID other_id) override;
 
-	virtual void update(double dt) override;
+	virtual void update(const Time &dt) override;
 	
 protected:
-	virtual void updateDesc() override;
+	//virtual void updateDesc() override;
 };
 
 class MidiTrackNode : public TrackNode<Time>
@@ -107,7 +105,7 @@ private:
 	static const std::vector<NodeConnectorDesc> nc_descs;
 	void initNode();
 
-	virtual void onUpdate(double dt) override;
+	virtual void onUpdate(const Time &dt) override;
 
 protected:
 
@@ -130,8 +128,8 @@ protected:
 	
 
 public:
-	MidiTrackNode(c_time track_length = 0);
-	MidiTrackNode(const MidiTrackNDesc &mtn_desc);
+	MidiTrackNode(NodeGraph *parent_graph, c_time track_length = 0);
+	//MidiTrackNode(NodeGraph *parent_graph, const MidiTrackNDesc &mtn_desc);
 	virtual ~MidiTrackNode();
 	
 	//Connector ids
@@ -157,11 +155,11 @@ public:
 	virtual bool flushData(FlushPacket &info) override;
 
 	//If output is null, passes a disposable copy of data.
-	virtual bool pullData(PullPacket &output, NCID this_id) override;
-	virtual bool pushData(PushPacket &input, NCID this_id) override;
+	virtual bool pullData(PullPacket &output, NCID this_id, NCID other_id) override;
+	virtual bool pushData(PushPacket &input, NCID this_id, NCID other_id) override;
 	
 protected:
-	virtual void updateDesc() override;
+	//virtual void updateDesc() override;
 };
 
 class ModTrackNode : public TrackNode<c_time>, public ModNode
@@ -193,8 +191,8 @@ protected:
 	virtual void onLengthChanged(c_time max_time_changed) override;
 
 public:
-	AudioModTrackNode(AudioModFunction mod_function, c_time track_length = 0);
-	AudioModTrackNode(const AudioModTrackNDesc &amtn_desc);
+	AudioModTrackNode(NodeGraph *parent_graph, AudioModFunction mod_function, c_time track_length = 0);
+	//AudioModTrackNode(NodeGraph *parent_graph, const AudioModTrackNDesc &amtn_desc);
 	virtual ~AudioModTrackNode() = default;
 	
 	//Connector indices
@@ -215,11 +213,11 @@ public:
 
 	virtual bool flushData(FlushPacket &info) override;
 	
-	virtual bool pullData(PullPacket &output, NCID this_id) override;
-	virtual bool pushData(PushPacket &input, NCID this_id) override;
+	virtual bool pullData(PullPacket &output, NCID this_id, NCID other_id) override;
+	virtual bool pushData(PushPacket &input, NCID this_id, NCID other_id) override;
 	
 protected:
-	virtual void updateDesc() override;
+	//virtual void updateDesc() override;
 };
 
 class MidiModTrackNode : public ModTrackNode
@@ -234,8 +232,8 @@ protected:
 	virtual void onLengthChanged(c_time max_time_changed) override;
 
 public:
-	MidiModTrackNode(SampleModFunction mod_function, c_time track_length = 0);
-	MidiModTrackNode(const MidiModTrackNDesc &mmtn_desc);
+	MidiModTrackNode(NodeGraph *parent_graph, SampleModFunction mod_function, c_time track_length = 0);
+	//MidiModTrackNode(NodeGraph *parent_graph, const MidiModTrackNDesc &mmtn_desc);
 	virtual ~MidiModTrackNode() = default;
 	
 	//Connector indices
@@ -256,12 +254,12 @@ public:
 
 	virtual bool flushData(FlushPacket &info) override;
 	
-	virtual bool pullData(PullPacket &output, NCID this_id) override;
-	virtual bool pushData(PushPacket &input, NCID this_id) override;
+	virtual bool pullData(PullPacket &output, NCID this_id, NCID other_id) override;
+	virtual bool pushData(PushPacket &input, NCID this_id, NCID other_id) override;
 	
 protected:
-	virtual void updateDesc() override;
+	//virtual void updateDesc() override;
 };
-
+*/
 
 #endif	//APOLLO_TRACK_NODE_H

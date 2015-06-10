@@ -49,7 +49,7 @@ public:
 	virtual Rect clampRect(const Rect &r) const override;
 	
 	//virtual void draw(GlInterface &gl) override;
-	//virtual void update(double dt) override;
+	//virtual void update(const Time &dt) override;
 };
 
 

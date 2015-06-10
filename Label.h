@@ -8,11 +8,11 @@
 class Label : public Display
 {
 protected:
-	std::string text;
-	Text textObj;
+	std::string	text;
+	APoint		center_point;
+	bool		centered = false;
 
-	APoint center_point;
-	bool centered = false;
+	Text		textObj;
 
 	void updateText();
 

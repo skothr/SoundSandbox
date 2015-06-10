@@ -24,7 +24,7 @@ struct AudioGraphData : public GraphData<s_time, AudioSample>
 	AudioGraphData(const AudioData *audio_data, bool flip_chunks, bool flip_chunk_samples, bool color_status);
 	virtual ~AudioGraphData();
 
-	virtual void update(double dt) override;
+	virtual void update(const Time &dt) override;
 
 	virtual void getData(FRange range, float x_step, std::vector<GPoint> &out_data) const override;
 	//virtual void drawData(Range<s_time> range, GlInterface &gl) const override;

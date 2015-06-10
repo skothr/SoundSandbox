@@ -175,6 +175,17 @@ AudioAmpChunk& AudioAmpChunk::operator-=(const AudioVelChunk &rhs)
 }
 
 
+AudioSample& AudioAmpChunk::operator[](unsigned int s_index)
+{
+	return data[s_index];
+}
+
+const AudioSample& AudioAmpChunk::operator[](unsigned int s_index) const
+{
+	return data[s_index];
+}
+
+
 /////AUDIO VEL CHUNK/////
 
 AudioVelChunk::AudioVelChunk(s_time chunk_size, AudioSample chunk_seed)
@@ -230,6 +241,7 @@ AudioSample AudioVelChunk::getSeed() const
 
 void AudioVelChunk::loadZeros()
 {
+	seed = 0;
 	for(auto &s : data)
 		s = 0;
 	chunkStep = 0;
@@ -346,3 +358,14 @@ AudioVelChunk& AudioVelChunk::operator-=(const AudioAmpChunk &rhs)
 	return *this;
 }
 */
+
+
+AudioVelSample& AudioVelChunk::operator[](unsigned int s_index)
+{
+	return data[s_index];
+}
+
+const AudioVelSample& AudioVelChunk::operator[](unsigned int s_index) const
+{
+	return data[s_index];
+}

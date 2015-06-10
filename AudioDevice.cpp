@@ -4,64 +4,70 @@
 #include <cstdlib>
 
 /////AUDIO DEVICE/////
-RtAudio *AudioDevice::g_audioOut = nullptr;
+RtAudio *AudioDevice::g_audio = nullptr;
 
 AudioDevice::AudioDevice()
 { }
 
+/*
 AudioDevice::AudioDevice(const AudioDevDesc &ad_desc)
 {
 	init(getId(ad_desc.name), ad_desc.sampleRate, ad_desc.chunkSize, ad_desc.numChannels, nullptr);
 }
+*/
 
 AudioDevice::~AudioDevice()
 {
-	try
+	if(audioDev)
 	{
-		audioOut->stopStream();
+		stop();
+		delete audioDev;
 	}
-	catch(RtAudioError &e)
-	{
-		e.printMessage();
-	}
-
-	if(audioOut->isStreamOpen())
-		audioOut->closeStream();
-
-	delete audioOut;
+	
+	audioDev = nullptr;
 }
 
 
-AStatus AudioDevice::initDevices()
+bool AudioDevice::initDevices()
 {
-	AStatus status;
+	bool status = true;
 
-	if(!g_audioOut)
+	if(!g_audio)
 	{
-		g_audioOut = new RtAudio();
+		g_audio = new RtAudio();
 	
 		if(numDevices() < 1)
 		{
-			std::cout << "NO AUDIO DEVICES!!\n";
-			status.setWarning(AS::WType::GENERAL, "No AudioDevices to connect to.");
+			std::cout << "No AudioDevices to connect to.\n";
+			status = false;
 		}
 	}
 	else
-		status.setWarning(AS::WType::ALREADY_INITIALIZED, "AudioDevice has already been initialized.");
+	{
+		std::cout << "AudioDevice has already been initialized.\n";
+		status = false;
+	}
 
 	return status;
 }
 
-unsigned int AudioDevice::numDevices()
+void AudioDevice::cleanupDevices()
 {
-	return (g_audioOut ? g_audioOut->getDeviceCount() : 0);
+	if(g_audio)
+		delete g_audio;
+	g_audio = nullptr;
 }
 
-AStatus AudioDevice::printDevices()
+unsigned int AudioDevice::numDevices()
 {
-	AStatus status;
+	return (g_audio ? g_audio->getDeviceCount() : 0);
+}
 
-	if(g_audioOut)
+bool AudioDevice::printDevices()
+{
+	bool status = true;
+
+	if(g_audio)
 	{
 		unsigned int n_devices = numDevices();
 		if(n_devices != 1)
@@ -74,7 +80,7 @@ AStatus AudioDevice::printDevices()
 
 		for(unsigned int i = 0; i < n_devices; i++)
 		{
-			RtAudio::DeviceInfo info = g_audioOut->getDeviceInfo(i);
+			RtAudio::DeviceInfo info = g_audio->getDeviceInfo(i);
 
 			std::string default_specifier = (info.isDefaultOutput ? "Default Output" : "");
 			default_specifier += (info.isDefaultInput && info.isDefaultOutput ? ", " : "");
@@ -85,7 +91,7 @@ AStatus AudioDevice::printDevices()
 			{
 				//Print device info
 
-				std::cout << "\t" << i + 1 << ":\t" << info.name << "  " << default_specifier << "\n";
+				std::cout << "\t" << i << ":\t" << info.name << "  " << default_specifier << "\n";
 				std::cout << "\t        " << "Max output channels:\t" << info.outputChannels << "\n";
 				std::cout << "\t        " << "Max input channels:\t" << info.inputChannels << "\n";
 				std::cout << "\t        " << "Max duplex channels:\t" << info.duplexChannels << "\n";
@@ -118,7 +124,10 @@ AStatus AudioDevice::printDevices()
 		}
 	}
 	else
-		status.setError(AS::ErrorType::GENERAL, "AudioDevice has yet to be successfully initialized.");
+	{
+		std::cout << "AudioDevice has yet to be successfully initialized.\n";
+		status = false;
+	}
 
 	return status;
 }
@@ -129,7 +138,7 @@ int AudioDevice::getId(std::string dev_name)
 
 	for(unsigned int i = 0; i < n_devices; i++)
 	{
-		RtAudio::DeviceInfo info = g_audioOut->getDeviceInfo(i);
+		RtAudio::DeviceInfo info = g_audio->getDeviceInfo(i);
 		if(info.name == dev_name)
 			return i;
 	}
@@ -137,9 +146,112 @@ int AudioDevice::getId(std::string dev_name)
 	return -1;
 }
 
-AStatus AudioDevice::init(unsigned int device_id, unsigned int sample_rate, unsigned int chunk_size, unsigned int num_channels, AudioCallback callback_func)
+void AudioDevice::setCallback(AudioCallback callback_func)
 {
-	AStatus status;
+	callback = callback_func;
+}
+
+void AudioDevice::start()
+{
+	if(!active)
+	{
+		try
+		{
+			active = true;
+			audioDev->startStream();
+		}
+		catch(RtAudioError &e)
+		{
+			e.printMessage();
+			return;
+		}
+	}
+}
+
+void AudioDevice::stop()
+{
+	if(active)
+	{
+		try
+		{
+			active = false;
+			audioDev->stopStream();
+		}
+		catch(RtAudioError &e)
+		{
+			e.printMessage();
+			return;
+		}
+	}
+}
+
+void AudioDevice::toggleActive()
+{
+	if(active)
+		stop();
+	else
+		start();
+}
+
+bool AudioDevice::isActive() const
+{
+	return active;
+}
+
+
+
+
+/////AUDIO OUT DEVICE/////
+AudioOutDevice::AudioOutDevice()
+{ }
+
+AudioOutDevice::AudioOutDevice(unsigned int device_id, unsigned int sample_rate, unsigned int chunk_size, unsigned int num_channels, AudioCallback callback_func)
+	: AudioDevice()
+{
+	init(device_id, sample_rate, chunk_size, num_channels, callback_func);
+}
+
+AudioOutDevice::~AudioOutDevice()
+{ }
+
+int AudioOutDevice::audioCallback(void *out_buffer, void *in_buffer, unsigned int buffer_size, double stream_time, RtAudioStreamStatus status, void *p_device)
+{
+	AudioOutDevice *p_dev = (AudioOutDevice*)p_device;
+	if(p_dev)
+	{
+		AudioSample *buffer = (AudioSample*)out_buffer;
+
+		if(status)
+			std::cout << "Stream underflow!!\n";	//??
+
+		//Get audio data from device's callback
+		bool stat = false;
+
+		BufferDesc data(buffer_size, p_dev->sampleRate, p_dev->numChannels);
+		if(p_dev->callback)
+			stat = p_dev->callback(data, stream_time);
+
+		if(stat)
+		{
+			//Copy data to buffer
+			for(c_time c = 0; c < p_dev->numChannels; c++)
+				for(s_time s = 0; s < buffer_size; s++)
+					//Interlace data
+					buffer[s*p_dev->numChannels + c] = data.data[c][s];
+
+			return 0;
+		}
+		else
+			std::cout << "AUDIO OUT DEVICE CALLBACK FAILED.\n";
+	}
+
+	return 1;
+}
+
+
+bool AudioOutDevice::init(unsigned int device_id, unsigned int sample_rate, unsigned int chunk_size, unsigned int num_channels, AudioCallback callback_func)
+{
+	bool status = true;
 
 	deviceId = device_id;
 	sampleRate = sample_rate;
@@ -151,9 +263,9 @@ AStatus AudioDevice::init(unsigned int device_id, unsigned int sample_rate, unsi
 
 	if(n_devices > 0 && device_id < n_devices)
 	{
-		RtAudio::DeviceInfo info = g_audioOut->getDeviceInfo(deviceId);
+		RtAudio::DeviceInfo info = g_audio->getDeviceInfo(deviceId);
 
-		audioOut = new RtAudio();
+		audioDev = new RtAudio();
 
 		RtAudio::StreamParameters param;
 		param.deviceId = deviceId;//audioOut->getDefaultOutputDevice();
@@ -162,116 +274,109 @@ AStatus AudioDevice::init(unsigned int device_id, unsigned int sample_rate, unsi
 
 		try
 		{
-			audioOut->openStream(&param, nullptr, RTAUDIO_SINT16, sampleRate, &chunkSize, &AudioDevice::audioCallback, (void*)this);
+			audioDev->openStream(&param, nullptr, RTAUDIO_SINT16, sampleRate, &chunkSize, &AudioOutDevice::audioCallback, (void*)this);
 		}
 		catch(RtAudioError &e)
 		{
-			status.setError(AS::ErrorType::GENERAL, e.getMessage());
+			std::cout << e.getMessage() << "\n";
+			status = false;
 		}
 	}
 	else
-		status.setError(AS::ErrorType::INDEX_OUT_OF_BOUNDS, "The requested device ID does not exist.");
+	{
+		std::cout << "The requested device ID does not exist.\n";
+		status = false;
+	}
 
 	return status;
 }
 
-int AudioDevice::audioCallback(void *out_buffer, void *in_buffer, unsigned int buffer_size, double stream_time, RtAudioStreamStatus status, void *p_device)
+/////AUDIO IN DEVICE/////
+AudioInDevice::AudioInDevice()
+{ }
+
+AudioInDevice::AudioInDevice(unsigned int device_id, unsigned int sample_rate, unsigned int chunk_size, unsigned int num_channels, AudioCallback callback_func)
+	: AudioDevice()
 {
-	AudioDevice *p_dev = (AudioDevice*)p_device;
+	init(device_id, sample_rate, chunk_size, num_channels, callback_func);
+}
+
+AudioInDevice::~AudioInDevice()
+{ }
+
+int AudioInDevice::audioCallback(void *out_buffer, void *in_buffer, unsigned int buffer_size, double stream_time, RtAudioStreamStatus status, void *p_device)
+{
+	AudioInDevice *p_dev = (AudioInDevice*)p_device;
 	if(p_dev)
 	{
-		AudioSample *buffer = (AudioSample*)out_buffer;
+		AudioSample *buffer = (AudioSample*)in_buffer;
 
 		if(status)
 			std::cout << "Stream underflow!!\n";	//??
 
-		//Get audio data from device's callback
-		AStatus status;
+		//Get audio data from input buffer
+		bool stat = false;
 
-		BufferDesc chunk(buffer_size, p_dev->sampleRate, p_dev->numChannels);
+		BufferDesc data(buffer_size, p_dev->sampleRate, p_dev->numChannels);
+
+		//Copy input buffer to data
+		for(c_time c = 0; c < p_dev->numChannels; c++)
+			for(s_time s = 0; s < p_dev->chunkSize; s++)
+				data.data[c][s] = buffer[s*p_dev->numChannels + c];
+
+		//Callback
 		if(p_dev->callback)
-			status = p_dev->callback(chunk, stream_time);
+			stat = p_dev->callback(data, stream_time);
 
-		if(statusGood(status))
-		{
-			//Copy data to buffer
-			for(s_time t = 0; t < buffer_size; t++)
-			{
-				for(int channel = 0; channel < p_dev->numChannels; channel++)
-				{
-					//Interlace data
-					buffer[t*p_dev->numChannels + channel] = (chunk.data[channel])[t];
-				}
-			}
-
-			return 0;
-		}
+		if(stat)
+			return 0;	//Success
 		else
-			std::cout << "AUDIO DEVICE CALLBACK FAILED.\n";
+			std::cout << "AUDIO IN DEVICE CALLBACK FAILED.\n";
 	}
 
 	return 1;
 }
 
-void AudioDevice::setCallback(AudioCallback callback_func)
+
+
+bool AudioInDevice::init(unsigned int device_id, unsigned int sample_rate, unsigned int chunk_size, unsigned int num_channels, AudioCallback callback_func)
 {
+	bool status = true;
+
+	deviceId = device_id;
+	sampleRate = sample_rate;
+	chunkSize = chunk_size;
+	numChannels = num_channels;
 	callback = callback_func;
-}
-
-void AudioDevice::play()
-{
-	if(!playing)
-	{
-		try
-		{
-			audioOut->startStream();
-		}
-		catch(RtAudioError &e)
-		{
-			e.printMessage();
-			return;
-		}
-		playing = true;
-	}
-}
-
-void AudioDevice::stop()
-{
-	if(playing)
-	{
-		try
-		{
-			audioOut->stopStream();
-		}
-		catch(RtAudioError &e)
-		{
-			e.printMessage();
-			return;
-		}
-		playing = false;
-	}
-}
-
-void AudioDevice::togglePlay()
-{
-	if(playing)
-		stop();
-	else
-		play();
-}
-
-bool AudioDevice::isPlaying() const
-{
-	return playing;
-}
-
-void AudioDevice::updateDesc()
-{
-	objDesc = (objDesc ? objDesc : (ObjDesc*)(new AudioDevDesc()));
-	AudioDevDesc *desc = dynamic_cast<AudioDevDesc*>(objDesc);
 	
-	desc->name = name;
-	desc->sampleRate = sampleRate;
-	desc->chunkSize = chunkSize;
-	desc->numChannels = numChannels;
+	unsigned int n_devices = numDevices();
+
+	if(n_devices > 0 && device_id < n_devices)
+	{
+		RtAudio::DeviceInfo info = g_audio->getDeviceInfo(deviceId);
+
+		audioDev = new RtAudio();
+
+		RtAudio::StreamParameters param;
+		param.deviceId = deviceId;//audioOut->getDefaultOutputDevice();
+		param.nChannels = numChannels;
+		param.firstChannel = 0;
+
+		try
+		{
+			audioDev->openStream(nullptr, &param, RTAUDIO_SINT16, sampleRate, &chunkSize, &AudioInDevice::audioCallback, (void*)this);
+		}
+		catch(RtAudioError &e)
+		{
+			std::cout << e.getMessage() << "\n";
+			status = false;
+		}
+	}
+	else
+	{
+		std::cout << "The requested device ID does not exist.\n";
+		status = false;
+	}
+
+	return status;
 }

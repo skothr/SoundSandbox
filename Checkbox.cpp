@@ -10,9 +10,9 @@ const int			Checkbox::TEXT_HEIGHT = 14.0f;
 
 Checkbox::Checkbox(ParentElement *parent_, APoint a_pos, GuiStateFlags s_flags, std::string label_text)
 	: GuiElement(parent_, a_pos, AVec(), GuiProps(s_flags, PROP_FLAGS)),
-		Control(GuiProps(s_flags, PROP_FLAGS)),
+		CompoundControl(GuiProps(s_flags, PROP_FLAGS)),
 		value(false),
-		label(nullptr, APoint(BORDER_PADDING.x + 2.0f*BOX_PADDING.x + OUTER_BOX_SIZE.x, 0.0f), SFlags::VISIBLE | SFlags::ENABLED, label_text, TEXT_HEIGHT)
+		label(this, APoint(BORDER_PADDING.x + 2.0f*BOX_PADDING.x + OUTER_BOX_SIZE.x, 0.0f), SFlags::VISIBLE | SFlags::ENABLED, label_text, TEXT_HEIGHT)
 {
 	AVec label_size = label.getSize();
 	
@@ -37,14 +37,16 @@ void Checkbox::setValue(bool val)
 	if(value != val)
 	{
 		value = val;
-		if(onValueChanged) onValueChanged();
+		if(onValueChanged)
+			onValueChanged();
 	}
 }
 
 void Checkbox::toggleValue()
 {
 	value = !value;
-	if(onValueChanged) onValueChanged();
+	if(onValueChanged)
+		onValueChanged();
 }
 
 bool Checkbox::getValue() const
@@ -82,6 +84,5 @@ void Checkbox::draw(GlInterface &gl)
 		label.draw(gl);
 
 		restoreViewport(gl);
-		
 	}
 }

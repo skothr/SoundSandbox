@@ -73,6 +73,40 @@ public:
 		T data[N];
 	};
 
+	//TODO: template specialization to make each size Vector have different variables
+	/*
+	template<int NN> union Vector<T, NN>
+	{
+		T x, y, z, w;
+		T data[NN];
+	};
+	template<> union Vector<T, 2>
+	{
+		//For accessing like a point/vector
+		T x, y;
+		//For accessing base data
+		T data[N];
+	};
+	template<> union Vector<T, 3>
+	{
+		//For accessing like a point/vector
+		T x, y, z;
+		//For accessing like a color
+		T r, g, b;
+		//For accessing base data
+		T data[N];
+	};
+	template<> union Vector<T, 4>
+	{
+		//For accessing like a point/vector
+		T x, y, z, w;
+		//For accessing like a color
+		T r, g, b, a;
+		//For accessing base data
+		T data[N];
+	};
+	*/
+
 	//OVERLOADS
 
 	//Assignment

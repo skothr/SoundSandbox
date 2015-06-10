@@ -9,14 +9,16 @@
 #include "Vector.h"
 #include "Texture.h"
 
+class GlInterface;
+
 class Font
 {
 private:
 	static FT_Library ft;
 
-	FT_Face m_fontface;
-	FT_GlyphSlot ascii_glyphs[256];
-	float charHeight;
+	FT_Face			m_fontface;
+	FT_GlyphSlot	ascii_glyphs[256];
+	float			charHeight;
 
 	void update();
 
@@ -39,15 +41,17 @@ public:
 class Text
 {
 private:
-	static ShaderProgram *textSP;
-	static GLuint vbID;
+	//static ShaderProgram *textSP;
+	//static GLuint vbID;
 
-	Font *font;
-	std::string text;
-	Texture tex;
+	//GlInterface		*gl = nullptr;
 
-	float	charHeight,
-			origin_y;
+	Font			*font = nullptr;
+	std::string		text = "";
+	Texture			tex;
+
+	float	charHeight = 0.0f,
+			origin_y = 0.0f;
 
 
 	void update();
@@ -55,6 +59,12 @@ private:
 public:
 	Text();
 	Text(std::string str, Font *f, float height = 30.0f);
+
+	virtual ~Text();
+	
+	//Text resources (per glContext)
+	static ShaderProgram *textSP;
+	static GLuint vbID;
 
 	static void loadResources();
 

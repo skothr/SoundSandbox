@@ -2,18 +2,28 @@
 
 #include "AUtility.h"
 
+#include "Node.h"
 #include "NodeBaseTypes.h"
 #include "TrackNodes.h"
 #include "InfoNodes.h"
-#include "IONodes.h"
+#include "SpeakerNode.h"
+#include "MicrophoneNode.h"
+#include "InstrumentNode.h"
+#include "MidiDeviceNode.h"
 #include "RenderNode.h"
 #include "ProjectTrackDisplay.h"
+#include "NodeConnection.h"
 
-#include "Vector.h"
+#include "MidiBufferNode.h"
+#include "AudioBufferNode.h"
+
+#include "MidiData.h"
+#include "ThreadedObject.h"
 
 #include "Note.h"	//For testing
 
 #define SPEAKER_BUFFER_SIZE 32//ceil(44100.0/AUDIO_CHUNK_SIZE)	//1 second of data
+#define MIC_BUFFER_SIZE 16
 
 int midi_port = -1;
 
@@ -190,41 +200,28 @@ std::vector<Point2f> NodeGraph::presetPositions[static_cast<unsigned int>(NodeGr
 
 
 NodeGraph::NodeGraph()
-{
-	nodes.clear();
-	nodeConnections.clear();
-}
+{ }
 
-NodeGraph::NodeGraph(const std::unordered_map<Node*, Point2f> &g_nodes)
+NodeGraph::NodeGraph(std::unordered_map<Node*, Point2f> &g_nodes, std::unordered_set<NodeConnection*> g_connections)
 {
 	nodes.reserve(g_nodes.size());
-	nodes.insert(g_nodes.begin(), g_nodes.end());
+	connections.reserve(g_connections.size());
 
-	//Find node connections
-	for(auto n : nodes)
-	{
-		std::vector<NodeConnector*> n_conn = n.first->getConnectors();
-		for(auto nconn : n_conn)
-		{
-			//std::unordered_map<NCID, NCOwnedPtr> c = nconn->getConnections();
-			CMap c = nconn->getConnections();
+	//Emplace nodes
+	for(auto &n : g_nodes)
+		nodes.emplace(n.first->getId(), std::unique_ptr<Node>(n.first));
 
-			for(auto nc : c)
-			{
-				//if(nodeConnections.count(nc.second) == 0)
-				//{
-					nodeConnections.emplace(nc.second);
-				//}
-			}
-		}
-	}
+	//Emplace connections
+	for(auto &c : g_connections)
+		connections.emplace(c->getId(), std::unique_ptr<NodeConnection>(c));
 }
 
 NodeGraph::~NodeGraph()
 {
-	reset();
+	resetGraph();
 }
 
+/*
 void NodeGraph::addConnection(COwnedPtr nc)
 {
 	nodeConnections.emplace(nc);
@@ -234,62 +231,114 @@ void NodeGraph::removeConnection(COwnedPtr nc)
 {
 	nodeConnections.erase(nc);
 }
+*/
 
 void NodeGraph::addNode(Node *n, Point2f g_pos)
 {
-	nodes.emplace(n, g_pos);
-	n->parentGraph = this;
-	
-	std::vector<NodeConnector*> n_conn = n->getConnectors();
-	for(auto nc : n_conn)
-	{
-		//std::unordered_map<NCID, NCOwnedPtr> c = nc->getConnections();
-		CMap c = nc->getConnections();
+	auto &iter = nodes.emplace(n->getId(), std::unique_ptr<Node>(n));
 
-		for(auto nconn : c)
-		{
-			if(nodeConnections.count(nconn.second) == 0)
-				nodeConnections.emplace(nconn.second);
-		}
-	}
+	iter.first->second.get()->graphPos = g_pos;
+	iter.first->second.get()->parentGraph = this;
 }
 
-/*
-void NodeGraph::removeNode(unsigned int index)
+bool NodeGraph::removeNode(NID id)
 {
-	AU::safeDelete(nodes[index]);
-	nodes.erase(nodes.begin() + index);
+	Node *n = getNode(id);
+
+	if(n)
+	{
+		//TODO
+		//Remove all connections including this node
+		//for(auto c : connections)
+		//{
+		//	if(c->from
+		//}
+		
+		//Delete node
+		nodes.erase(id);
+
+		return true;
+	}
+	else
+		return false;
+}
+/*
+bool NodeGraph::connectNodes(NID n1, NID n2)
+{
+	std::unique_ptr<Node>	*node1 = getNode(n1),
+							*node2 = getNode(n2);
+
+	return (node1 && node2) ? connectNodes(*node1->get(), *node2->get()) : false;
+}
+
+bool NodeGraph::connectNodes(Node &n1, Node &n2)
+{
+	connections.emplace(new NodeConnection(
 }
 */
-void NodeGraph::removeNode(Node *n)
-{
-	/*
-	for(unsigned int i = 0; i < nodes.size(); i++)
-	{
-		if(nodes[i] == n)
-		{
-			removeNode(i);
-			break;
-		}
-	}
-	*/
 
-	for(auto nc : n->getConnectors())
-	{
-		for(auto nconn : nc->getConnections())
-		{
-			if(nodeConnections.count(nconn.second) > 0)
-				nodeConnections.erase(nconn.second);
-		}
-	}
-	
-	nodes.erase(n);
-	delete n;
+NodeConnection* NodeGraph::makeNewConnection(NCID nc1, NCID nc2)
+{
+	NodeConnection *c = new NodeConnection(nc1, nc2);
+	auto &iter = connections.emplace(c->getId(), std::unique_ptr<NodeConnection>(c));
+
+	return iter.first->second.get();
+
+	//if(nc.fromIsConnected())
+	//	nc.fromNc->onConnect(nc.toId, *iter.first->second.get());
+	//if(nc.toIsConnected())
+	//	nc.toNc->onConnect(nc.fromId, *iter.first->second.get());
 }
 
-const std::unordered_map<Node*, Point2f>* NodeGraph::getNodes()
+NodeConnection* NodeGraph::makeNewConnection(NCID nc)
 {
-	return &nodes;
+	NodeConnection *c = new NodeConnection(nc);
+	auto &iter = connections.emplace(c->getId(), std::unique_ptr<NodeConnection>(c));
+
+	return iter.first->second.get();
+}
+
+bool NodeGraph::removeConnection(CID id)
+{
+	auto iter = connections.find(id);
+
+	if(iter != connections.end())
+	{
+		connections.erase(iter);
+		return true;
+	}
+	else
+		return false;
+}
+
+
+Node* NodeGraph::getNode(NID id)
+{
+	auto iter = nodes.find(id);
+
+	return (iter != nodes.end()) ? iter->second.get() : nullptr;
+}
+
+const std::unordered_map<NID, Node*> NodeGraph::getNodes()
+{
+	std::unordered_map<NID, Node*> g_nodes;
+	g_nodes.reserve(nodes.size());
+
+	for(auto &n : nodes)
+		g_nodes.emplace(n.first, n.second.get());
+
+	return g_nodes;
+}
+
+const std::unordered_map<CID, NodeConnection*> NodeGraph::getConnections()
+{
+	std::unordered_map<CID, NodeConnection*> g_conn;
+	g_conn.reserve(nodes.size());
+
+	for(const auto &c : connections)
+		g_conn.emplace(c.first, c.second.get());
+
+	return g_conn;
 }
 
 
@@ -330,53 +379,73 @@ NodeTree* NodeGraph::getNodeTree()
 }
 */
 
-unsigned int NodeGraph::numNodes()
+unsigned int NodeGraph::getNumNodes() const
 {
 	return nodes.size();
 }
 
-
-void NodeGraph::reset()
+unsigned int NodeGraph::getNumConnections() const
 {
-	for(auto &n : nodes)
-		//AU::safeDelete(n.first);
-		delete n.first;
-	nodes.clear();
-
-	nodeConnections.clear();
-
+	return connections.size();
 }
 
-void NodeGraph::update(double dt)
+
+void NodeGraph::resetGraph()
 {
-	for(auto n : nodes)
-		n.first->update(dt);
-	//for(unsigned int i = 0; i < nodes.size(); i++)
-	//	nodes[i]->update(dt);
+	//Stop all currently running devices/threads
+	stopAllDevices();
+
+	//Delete all connections
+	connections.clear();
+	
+	//Now delete all nodes
+	nodes.clear();
+}
+
+void NodeGraph::update(const Time &dt)
+{
+	for(auto &n : nodes)
+		n.second->update(dt);
+}
+
+void NodeGraph::resetConnectionStates()
+{
+	for(auto &c : connections)
+		c.second->resetConnectionStates();
 }
 
 void NodeGraph::setPreset(NodeGraphPreset preset, int sample_rate)
 {
 	AStatus status;
 
-	MidiTrackNode	*mainMidiBuf;
-	InstrumentNode	*instrument1,
-					*instrument2;
-	RenderNode		*mainRender;
-	AudioTrackNode *mainAudioBuf,
-					*audioBuf2;
-	SpeakerNode		*mainSpeaker;
+	StaticMidiBufferNode	*mainMidiBuf;
+	InstrumentNode			*instrument1,
+							*instrument2;
+	RenderNode				*mainRender;
+	DynamicAudioBufferNode	*mainAudioBuf,
+							*audioBuf2;
+	SpeakerNode				*mainSpeaker;
+	MicrophoneNode			*mainMic;
 
-	MidiDeviceNode	*mainDevice;
+	MidiDeviceNode			*mainDevice;
 
-	//TimeMapNode		*timeMap;
+	RenderNode				*render2;
 
-	RenderNode		*render2;
-	
+	std::unique_ptr<Node>					mainMidiBuf_ptr,
+											instrument1_ptr,
+											instrument2_ptr,
+											mainRender_ptr,
+											mainAudioBuf_ptr,
+											audioBuf2_ptr,
+											mainSpeaker_ptr,
+											mainMic_ptr,
+											mainDevice_ptr,
+											render2_ptr;
+
 	MidiData notes;	//For testing
 
 	
-	reset();
+	resetGraph();
 	//initialPos = &presetPositions[toIndex(preset)];
 
 
@@ -388,43 +457,47 @@ void NodeGraph::setPreset(NodeGraphPreset preset, int sample_rate)
 
 	//Initial NodeGraph for a new sandbox
 	case NodeGraphPreset::SANDBOX:
+
 		//Preset Nodes
-		instrument1 = new InstrumentNode();
-		mainRender = new RenderNode(sample_rate);
-		mainSpeaker = new SpeakerNode(0, sample_rate, SPEAKER_BUFFER_SIZE, nullptr);
-		mainDevice = new MidiDeviceNode(midi_port);	//TODO: Choose port with gui
+		instrument1 = new InstrumentNode(this);
+		mainRender = new RenderNode(this, sample_rate);
+		mainSpeaker = new SpeakerNode(this, 0, sample_rate, SPEAKER_BUFFER_SIZE, nullptr);
+		mainMic = new MicrophoneNode(this, 4, sample_rate, MIC_BUFFER_SIZE);
+		mainDevice = new MidiDeviceNode(this, midi_port);	//TODO: Choose port with gui
 		
 		//Add nodes to list
 		addNode(mainDevice, Point2f(-200.0f, -25.0f));
 		addNode(mainRender, Point2f(-50.0f, -25.0f));
 		addNode(instrument1, Point2f(-50.0f, -175.0f));
 		addNode(mainSpeaker, Point2f(100.0f, -25.0f));
+		addNode(mainMic,	Point2f(-100.0f, 75.0f));
 
 		//Preset Connections
 		//Node::connect(mainDevice->OUTPUTS.MIDI_ID, mainRender->INPUTS.MIDI_ID);
 		//Node::connect(instrument1->OUTPUTS.INSTRUMENT_ID, mainRender->INPUTS.INSTRUMENT_ID);
 		//Node::connect(mainRender->OUTPUTS.AUDIO_ID, mainSpeaker->INPUTS.AUDIO_ID);
 
-		mainDevice->connect(mainDevice->OUTPUTS.MIDI_ID, mainRender->INPUTS.MIDI_ID);
-		instrument1->connect(instrument1->OUTPUTS.INSTRUMENT_ID, mainRender->INPUTS.INSTRUMENT_ID);
-		mainRender->connect(mainRender->OUTPUTS.AUDIO_ID, mainSpeaker->INPUTS.AUDIO_ID);
+		makeNewConnection(mainDevice->OUTPUTS.MIDI_ID, mainRender->INPUTS.MIDI_ID);
+		makeNewConnection(instrument1->OUTPUTS.INSTRUMENT_ID, mainRender->INPUTS.INSTRUMENT_ID);
+		makeNewConnection(mainRender->OUTPUTS.AUDIO_ID, mainSpeaker->INPUTS.AUDIO_ID);
 		
 		break;
 
 	//Initial NodeGraph for a new project
 	case NodeGraphPreset::PROJECT:
 		//Preset Nodes
-		mainMidiBuf = new MidiTrackNode();
-		instrument1 = new InstrumentNode();
-		mainRender = new RenderNode(sample_rate);
-		mainAudioBuf = new AudioTrackNode(sample_rate, 1000);
-		mainSpeaker = new SpeakerNode(0, sample_rate, SPEAKER_BUFFER_SIZE, nullptr);
+		mainMidiBuf = new StaticMidiBufferNode(this);
+		instrument1 = new InstrumentNode(this);
+		mainRender = new RenderNode(this, sample_rate);
+		mainAudioBuf = new DynamicAudioBufferNode(this, sample_rate, 1000);
+		mainSpeaker = new SpeakerNode(this, 0, sample_rate, SPEAKER_BUFFER_SIZE, nullptr);
+		mainMic = new MicrophoneNode(this, 3, sample_rate, MIC_BUFFER_SIZE);
 
 		//timeMap = new TimeMapNode(sample_rate);
 
-		mainDevice = new MidiDeviceNode(midi_port);
-		instrument2 = new InstrumentNode();
-		render2 = new RenderNode(sample_rate);
+		mainDevice = new MidiDeviceNode(this, midi_port);
+		instrument2 = new InstrumentNode(this);
+		render2 = new RenderNode(this, sample_rate);
 		//audioBuf2 = new AudioTrackNode(sample_rate);
 		
 		//Add nodes to list
@@ -433,6 +506,7 @@ void NodeGraph::setPreset(NodeGraphPreset preset, int sample_rate)
 		addNode(mainRender, Point2f(-150.0f, -75.0f));
 		addNode(mainAudioBuf, Point2f(-25.0f, -75.0f));
 		addNode(mainSpeaker, Point2f(250.0f, -25.0f));
+		addNode(mainMic,	Point2f(-100.0f, 75.0f));
 
 		//addNode(timeMap, Point2f(100.0f, -25.0f));
 
@@ -443,28 +517,40 @@ void NodeGraph::setPreset(NodeGraphPreset preset, int sample_rate)
 
 
 		//Preset Connections
-		mainMidiBuf->connect(mainMidiBuf->OUTPUTS.MIDI_ID, mainRender->INPUTS.MIDI_ID);
-		instrument1->connect(instrument1->OUTPUTS.INSTRUMENT_ID, mainRender->INPUTS.INSTRUMENT_ID);
-		mainRender->connect(mainRender->OUTPUTS.AUDIO_ID, mainAudioBuf->INPUTS.AUDIO_ID);
-		mainAudioBuf->connect(mainAudioBuf->OUTPUTS.AUDIO_ID, mainSpeaker->INPUTS.AUDIO_ID);
+		makeNewConnection(mainMidiBuf->OUTPUTS.MIDI_ID, mainRender->INPUTS.MIDI_ID);
+		makeNewConnection(instrument1->OUTPUTS.INSTRUMENT_ID, mainRender->INPUTS.INSTRUMENT_ID);
+		makeNewConnection(mainRender->OUTPUTS.AUDIO_ID, mainAudioBuf->INPUTS.AUDIO_ID);
+		makeNewConnection(mainAudioBuf->OUTPUTS.AUDIO_ID, mainSpeaker->INPUTS.AUDIO_ID);
 		//timeMap->connect(timeMap->OUTPUTS.AUDIO_ID, mainSpeaker->INPUTS.AUDIO_ID);
 		
-		mainDevice->connect(mainDevice->OUTPUTS.MIDI_ID, render2->INPUTS.MIDI_ID);
-		instrument2->connect(instrument2->OUTPUTS.INSTRUMENT_ID, render2->INPUTS.INSTRUMENT_ID);
-		render2->connect(render2->OUTPUTS.AUDIO_ID, mainSpeaker->INPUTS.AUDIO_ID);
+		makeNewConnection(mainDevice->OUTPUTS.MIDI_ID, render2->INPUTS.MIDI_ID);
+		makeNewConnection(instrument2->OUTPUTS.INSTRUMENT_ID, render2->INPUTS.INSTRUMENT_ID);
+		makeNewConnection(render2->OUTPUTS.AUDIO_ID, mainSpeaker->INPUTS.AUDIO_ID);
 
 
 		////ADD TEST NOTES (Legend of Zelda Main Theme)////
 		//legendOfZeldaTheme1.interpret(notes, 0.0, 30);
-		legendOfZeldaTheme2.interpret(notes, 0.0, 30, 100);
+		//legendOfZeldaTheme2.interpret(notes, 0.0, 30, 100);
 		//notes.addNote(MidiNote(-1, 0, 0.0, 100.0));	//100-second long rest (empty)
-		mainMidiBuf->setBuffer(notes);
-		mainAudioBuf->setLength((c_time)(mainMidiBuf->getData()->getSpan().length()*(float)sample_rate/(float)AUDIO_CHUNK_SIZE));
+		//mainMidiBuf->setBuffer(notes);
+
+		mainMidiBuf->setLength(360.0);
+		mainAudioBuf->setLength((c_time)(mainMidiBuf->getLength()*(Time)((double)sample_rate/(double)AUDIO_CHUNK_SIZE)));
 
 		break;
 
 	default:	//NODEGRAPH_PRESET_INVALID
 		//Error
 		break;
+	}
+}
+
+void NodeGraph::stopAllDevices()
+{
+	for(auto &n : nodes)
+	{
+		ThreadedObject *t = dynamic_cast<ThreadedObject*>(n.second.get());
+		if(t)
+			t->shutDownThread();
 	}
 }

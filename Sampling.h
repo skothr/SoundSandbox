@@ -2,11 +2,19 @@
 #define APOLLO_SAMPLING_H
 
 #include "Timing.h"
+#include "Audio.h"
 
 typedef int MidiIndex;
 
 typedef int16_t AudioSample;
 typedef AudioSample AudioVelSample;
+
+struct SampleState;
+struct SampleInfo;
+
+
+typedef std::function<bool(SampleState &state, const SampleInfo &info, AudioVelSample &out_value, bool add_sample)> NoteSampleFunction;
+
 
 enum class SampleMethod
 {

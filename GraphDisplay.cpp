@@ -205,12 +205,12 @@ void GraphDisplay::drawBackground(GlInterface &gl)
 
 	//Vertical lines (x dimension) --> GREY
 	gl.setColor(Color(0.4f, 0.4f, 0.4f, 1.0f));
-	for(float a_x = start_lines.x; a_x < size.x; a_x += line_step.x)
+	for(float a_x = start_lines.x; a_x < v_size.x; a_x += line_step.x)
 		gl.drawLine(APoint(a_x, 0.0f), APoint(a_x, size.y));
 	
 	//Horizontal lines (y dimension) --> GREY
 	gl.setColor(Color(0.4f, 0.4f, 0.4f, 1.0f));
-	for(float a_y = start_lines.y; a_y < size.y; a_y += line_step.y)
+	for(float a_y = start_lines.y; a_y < v_size.y; a_y += line_step.y)
 		gl.drawLine(APoint(0.0f, a_y), APoint(size.x, a_y));
 }
 

@@ -1,13 +1,13 @@
 /**********************************************************************/
 /*! \class RtMidi
-    \brief An abstract base class for realtime MIDI input/output.
+    \brief An abstract base class for Time MIDI input/output.
 
-    This class implements some common functionality for the realtime
+    This class implements some common functionality for the Time
     MIDI input/output subclasses RtMidiIn and RtMidiOut.
 
     RtMidi WWW site: http://music.mcgill.ca/~gary/rtmidi/
 
-    RtMidi: realtime MIDI i/o C++ classes
+    RtMidi: Time MIDI i/o C++ classes
     Copyright (c) 2003-2014 Gary P. Scavone
 
     Permission is hereby granted, free of charge, to any person

@@ -14,7 +14,7 @@ protected:
 public:
 	virtual ~Container();
 
-	virtual void update(double dt) override;
+	virtual void update(const Time &dt) override;
 };
 
 

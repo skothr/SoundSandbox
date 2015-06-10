@@ -28,6 +28,7 @@ struct Range
 	bool contains(const T &p) const;
 	//Whether this range +- tol contains the given point.
 	bool contains(const T &p, const T &tol) const;
+
 };
 
 template<typename T>

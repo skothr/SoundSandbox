@@ -14,7 +14,7 @@
 #include "Interpolation.h"
 #include "WavePoint.h"
 
-#include "Saveable.h"
+//#include "Saveable.h"
 
 class ModTrack;
 
@@ -45,7 +45,7 @@ inline double cubeInterp(double s_x, WavePoint p0, WavePoint p1, WavePoint p2, W
 
 
 
-class Waveform : public Saveable
+class Waveform// : public Saveable
 {
 public:
 	static const int NUM_CACHE_POINTS = 8192;
@@ -58,7 +58,7 @@ private:
 
 public:
 	Waveform();
-	Waveform(const WaveformDesc &wave_desc);
+	//Waveform(const WaveformDesc &wave_desc);
 
 	void cacheWaveform();
 
@@ -66,7 +66,7 @@ public:
 	void removePoint(int index);
 	void clearPoints();
 
-	const std::vector<WavePoint>* getPoints() const;
+	std::vector<WavePoint>* getPoints();
 	const FAudioSample* getCache() const;
 
 	void setSin();
@@ -85,7 +85,7 @@ public:
 	*/
 	
 protected:
-	virtual void updateDesc() override;
+	//virtual void updateDesc() override;
 };
 
 #endif	//APOLLO_WAVEFORM_H

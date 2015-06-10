@@ -1,7 +1,7 @@
 #include "MidiTrackControl.h"
 
 #include "MidiDataDisplay.h"
-#include "TrackNodes.h"
+#include "MidiBufferNode.h"
 
 #include "Cursor.h"
 
@@ -9,7 +9,7 @@
 const GuiPropFlags	MidiTrackControl::PROP_FLAGS = PFlags::HARD_BACK;
 const AVec			MidiTrackControl::PADDING = AVec(5.0f, 5.0f);
 
-MidiTrackControl::MidiTrackControl(ParentElement *parent_, APoint a_pos, float height, GuiStateFlags s_flags, MidiTrackNode *t_node, float seconds_per_pixel)
+MidiTrackControl::MidiTrackControl(ParentElement *parent_, APoint a_pos, float height, GuiStateFlags s_flags, MidiBufferNode *t_node, float seconds_per_pixel)
 	: GuiElement(parent_, a_pos, AVec(100.0f, height), GuiProps(s_flags, PROP_FLAGS)),
 		CompoundControl(GuiProps(s_flags, PROP_FLAGS)),
 		node(t_node), secondsPerPixel(seconds_per_pixel)
@@ -40,7 +40,7 @@ void MidiTrackControl::setCursor(Cursor *p_cursor)
 	cursor = p_cursor;
 }
 
-void MidiTrackControl::setTrackNode(MidiTrackNode *new_node)
+void MidiTrackControl::setTrackNode(MidiBufferNode *new_node)
 {
 	node = new_node;
 	dataDisp->setData(node->getData());		//TODO: Get seconds per pixel

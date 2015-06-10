@@ -8,6 +8,7 @@
 #include "MIDI.h"
 #include "WavePoint.h"
 #include "FileSystem.h"
+#include "NodeResources.h"
 
 #include "AudioData.h"
 
@@ -26,9 +27,6 @@ class NodeConnector;
 class NodeConnection;
 //typedef std::weak_ptr<NodeConnection> NCAccessPtr;
 //typedef std::shared_ptr<NodeConnection> NCOwnedPtr;
-
-typedef NodeConnector* NCOwnedPtr;
-typedef NodeConnection* COwnedPtr;
 
 //Contains structs used for describing all required information necessary for each type of object
 //	Except for vectors, cannot rely on pointers!! (Used for saving data across sessions)
@@ -164,7 +162,7 @@ struct NCDesc : public ObjDesc
 	std::string			name,
 						desc;
 
-	std::vector<NCOwnedPtr>	connections;
+	std::vector<NodeConnection*>	connections;
 	
 	virtual int writeToFile(std::ofstream &out) override;
 	virtual int readFromFile(std::ifstream &in) override;
@@ -172,7 +170,7 @@ struct NCDesc : public ObjDesc
 
 struct NDesc : public ObjDesc
 {
-	NID				id;
+	NID					id;
 	NodeType			type;
 
 	std::string			nameStr,

@@ -4,6 +4,51 @@
 #include <limits>
 
 
+/////TIME/////
+/*
+Time::Time()
+{ }
+
+Time::Time(PhysTime time)
+	: t(time)
+{ }
+Time::Time(PhysTime time, bool is_global)
+	: t(time), global(is_global)
+{ }
+
+bool Time::isGlobal() const
+{
+	return global;
+}
+	
+Time& Time::operator=(const Time &other)
+{
+	t = other.t;
+	global = other.global;
+
+	return *this;
+}
+
+Time& Time::operator=(const PhysTime &time)
+{
+	t = time;
+	global = false;
+}
+
+Time::operator PhysTime() const
+{
+	return t;
+}
+*/
+
+/*
+Time::operator Time() const
+{ return Time(t); }
+
+Time::operator Time() const
+{ return Time(t); }
+*/
+
 /////CLOCK/////
 const double Clock::ratios[static_cast<unsigned int>(TimeUnits::COUNT)]
 {
@@ -42,7 +87,7 @@ void Clock::initGlobalTime()
 	GST_INITIALIZED = true;
 }
 
-double Clock::getGlobalTime(TimeUnits units)
+Time Clock::getGlobalTime(TimeUnits units)
 {
 	return (Time)(ClockType::now() - GLOBAL_START_TIME).count()*secondsMult*ratios[toIndex(units)] * (Time)GST_INITIALIZED;
 }
@@ -101,7 +146,7 @@ void Clock::waitUntil(Time t)
 		;
 }
 
-double Clock::getExactTime(TimeUnits units) const
+Time Clock::getExactTime(TimeUnits units) const
 {
 	return (Time)getExactTimeDuration().count()*secondsMult*ratios[toIndex(units)];
 }
@@ -150,7 +195,7 @@ TimeTest::TimeTest(TimeUnits units_, const std::string &print_label)
 void TimeTest::start(bool reset_avg)
 {
 	//START TIMING TEST
-	tStart = Clock::getGlobalTime(units);
+	tStart = (Time)Clock::getGlobalTime(units);
 
 	t_accumulator = reset_avg ? 0.0 : t_accumulator;
 	max = reset_avg ? -1.0 : max;
@@ -161,7 +206,7 @@ void TimeTest::start(bool reset_avg)
 void TimeTest::end()
 {
 	//END TIMING TEST
-	tEnd = Clock::getGlobalTime(units);
+	tEnd = (Time)Clock::getGlobalTime(units);
 	dt = tEnd - tStart;
 
 	max = dt > max ? dt : max;
@@ -178,7 +223,7 @@ void TimeTest::printResults()
 	std::cout << label << (label == "" ? "" : " -->\n");
 	std::cout << "-------------------------------------\n";
 	std::cout << "\nTIMING RESULTS\t-->\t" << std::fixed << dt << unitSuffix << "\n";
-	std::cout << "AVERAGE\t\t-->\t" << std::fixed << (t_accumulator/(double)count) << unitSuffix << "\n";
+	std::cout << "AVERAGE\t\t-->\t" << std::fixed << (t_accumulator/(Time)count) << unitSuffix << "\n";
 	std::cout << "MAX\t\t-->\t" << std::fixed << max << unitSuffix << "\n";
 	std::cout << "MIN\t\t-->\t" << std::fixed << min << unitSuffix << "\n";
 	std::cout << "-------------------------------------\n\n";

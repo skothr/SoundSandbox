@@ -6,6 +6,7 @@
 #include <cstdint>
 
 s_time AUDIO_CHUNK_SIZE = 512;
+s_time DEFAULT_SAMPLE_RATE = 44100;
 float AUDIO_MAX_AMPLITUDE = 16000.0f;
 
 

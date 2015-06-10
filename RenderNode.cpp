@@ -3,6 +3,11 @@
 #include "AUtility.h"
 #include "Waveform.h"
 
+#include "NodeConnection.h"
+#include "NodePackets.h"
+
+#include "MidiData.h"
+
 #define TIME_RENDER false
 //#define TIME_RENDER true
 
@@ -18,6 +23,11 @@ MidiTracker::MidiTracker(int sample_rate)
 	//events.reserve(32);
 }
 
+MidiTracker::~MidiTracker()
+{
+	activeStates.clear();
+}
+
 
 
 /////RENDER NODE/////
@@ -26,14 +36,18 @@ const std::vector<NodeConnectorDesc> RenderNode::nc_descs =
 			  NodeConnectorDesc(NodeData::INFO, IOType::INFO_INPUT, "Instrument Input", "Input instrument to use in rendering.", 1),
 			  NodeConnectorDesc(NodeData::AUDIO, IOType::DATA_OUTPUT, "Audio Output", "Rendered audio data.", -1) };
 
-RenderNode::RenderNode(int sample_rate)
-	: Node(NType::RENDER, "Render Node", "Renders MIDI data into actual audio data."),
+std::unordered_set<RenderNode*> RenderNode::renderNodes;
+
+RenderNode::RenderNode(NodeGraph *parent_graph, int sample_rate)
+	: Node(parent_graph, NType::RENDER, "Render Node", "Renders MIDI data into actual audio data."),
 		sampleRate(sample_rate), renderBuffer(AUDIO_CHUNK_SIZE, RENDER_BUFFER_SIZE, true)
 {
+	renderNodes.emplace(this);
 	initNode();
 	initBuffer();
 }
 
+/*
 RenderNode::RenderNode(const RenderNDesc &rn_desc)
 	: Node(*(NDesc*)&rn_desc),
 		sampleRate(rn_desc.sampleRate), renderBuffer(AUDIO_CHUNK_SIZE, RENDER_BUFFER_SIZE, true)
@@ -45,16 +59,42 @@ RenderNode::RenderNode(const RenderNDesc &rn_desc)
 
 	initBuffer();
 }
+*/
 
 RenderNode::~RenderNode()
 {	
-	for(auto t : pullTrackers)
-		AU::safeDelete(t.second);
-	pullTrackers.clear();
+	//for(auto t : pullTrackers)
+	//	AU::safeDelete(t.second);
+	//pullTrackers.clear();
 	
 	for(auto t : pushTrackers)
 		AU::safeDelete(t.second);
 	pushTrackers.clear();
+
+	renderNodes.erase(this);
+}
+
+void RenderNode::renderNodeFlush()
+{
+	for(auto rn : renderNodes)
+	{
+		bool has_events = false;
+
+		for(auto t : rn->pushTrackers)
+			has_events |= (t.second->events.size() > 0 || t.second->activeStates.size() > 0);
+
+		if(rn->activeChunk)
+		{
+			if(!rn->pushedThisChunk && has_events)
+				rn->flushEvents();
+			else
+				rn->activeChunk->loadZeros();
+
+			rn->activeChunk = rn->renderBuffer.shiftBuffer();
+		}
+		
+		rn->pushedThisChunk = false;
+	}
 }
 
 void RenderNode::initNode()
@@ -87,6 +127,7 @@ void RenderNode::initBuffer()
 
 	renderBuffer.loadZeros();
 	activeChunk = renderBuffer.getActiveChunk();
+	lastActiveChunk = activeChunk;
 }
 
 void RenderNode::setSampleRate(int sample_rate)
@@ -126,6 +167,71 @@ void RenderNode::addMidiEvents(MidiEventQueue &e_q, const MidiEventQueue &src)
 	e_q.insert(e_q.end(), src.begin(), src.end());
 }
 
+void RenderNode::pushEvent(MidiEvent e, NCID connector)
+{
+	/*
+	MidiTracker &m_tracker = *pushTrackers[connector];
+		
+	m_tracker.events.push_back(e);
+	*/
+
+	
+	MidiTracker &m_tracker = *pushTrackers[connector];
+
+	m_tracker.events.push_back(e);
+
+}
+
+void RenderNode::addPulledEvents(const MidiSet &notes, TimeRange t_range, NCID connector)
+{
+	MidiTracker &m_tracker = *pullTrackers[connector];
+	
+	MidiEventQueue new_events;
+
+	//TimeRange cursor_range = globalCursor.getGlobalTimeRange();
+	//TimeRange	g_range = globalRange;
+	
+	//Add note events
+	for(const auto n : notes)
+	{
+		//TimeRange g_range = globalCursor.convertToGlobal(n->range);
+
+		//Add note start if note starts within rendering range (convert to global time)
+		if(t_range.contains(n->range.start))
+		{
+			new_events.push_back(MidiEvent(n->index, MidiEventType::NOTE_ON, n->velocity, n->range.start));
+			//std::cout << "SUCCESS --> " << n->range.start << ", " << n->range.end << ":\n";
+			//std::cout << "\t G_NOTE --> " << g_range.start << ", " << g_range.end << "\n";
+			//std::cout << "\t G_CURSOR --> " << gc_range.start << ", " << gc_range.end << "\n\n";
+		}
+
+		//TODO: Handle notes that started before renderNode started rendering
+
+		//else if(n.end >= start && !states.keyStates[n.index].noteOn)
+		//	events.push_back(MidiEvent(n.index, MidiEventType::NOTE_ON, n.velocity, n.start));
+
+		//Add note end if note ends within rendering range (convert to global time)
+		else if(n->isFinished() && t_range.contains(n->range.end))//(range.contains(n->range.end) || n->range.end == range.end))
+		{
+			new_events.push_back(MidiEvent(n->index, MidiEventType::NOTE_OFF, n->velocity, n->range.end));
+		}
+		else if(m_tracker.activeStates.find(n->index) == m_tracker.activeStates.end())
+		{
+			std::cout << "FAILURE --> " << n->range.start << ", " << n->range.end << ":\n";
+			std::cout << "\t RANGE --> " << t_range.start << ", " << t_range.end << "\n";
+		}
+	}
+
+	//Add new events (ordered by time)
+	addMidiEvents(m_tracker.events, new_events);
+
+
+	//std::cout << "\n-------------------\n\n";
+
+	//m_tracker.events.insert(m_tracker.events.end(), note_queue.begin(), note_queue.end());
+}
+
+/*
 void RenderNode::updateEvents(const MidiData &notes, TimeRange range, NCID connector, NCDir dir)
 {
 	MidiTracker &m_tracker = *(dir == NCDir::BACKWARD ? pullTrackers : pushTrackers)[connector];
@@ -135,7 +241,7 @@ void RenderNode::updateEvents(const MidiData &notes, TimeRange range, NCID conne
 	//new_events.reserve(notes.numNotes()*2);
 	
 	//Add note events
-	for(const auto n : notes.getConstNotes())
+	for(const auto n : notes.getOrderedConstNotes())
 	{
 		//std::cout << "RENDER EVENT --> (" << n->range.start << ", " << n->range.end << ") : (" << range.start << ", " << range.end << ")\n";
 
@@ -195,9 +301,151 @@ void RenderNode::shiftBuffer()
 
 	//pushBuffer[pushBuffer.size() - 1]->setSeed(new_seed);
 }
+*/
 
 
-bool RenderNode::render(NoteSampleFunction &sample, AudioVelChunk **chunk, const TimeRange &t_range, const ChunkRange &c_range, TransferMethod method, NCDir dir)
+bool RenderNode::render(NoteSampleFunction &sample, AudioVelChunk *chunk, TimeRange g_range, TransferMethod method, bool flush)
+{
+	AudioVelChunk *output_data = chunk;
+
+	const double	sample_rate_inv = 1.0/(double)sampleRate,
+					chunk_size_inv = 1.0/(double)chunk->getSize(),
+					amp_mult = ((double)AUDIO_MAX_AMPLITUDE*(1.0/127.0)),	//Scales a midi velocity to an actual amplitude
+
+					time_length = (double)chunk->getSize()*sample_rate_inv;
+	
+	//const s_time	s_end = (s_time)ceil(time_length*(double)sampleRate);
+	
+	//Overwrite previous data
+	//TODO: See if this can be avoided?
+	if(method == TransferMethod::COPY)
+		output_data->loadZeros();
+
+	std::unordered_map<NCID, MidiTracker*> tracker_list = flush ? pushTrackers : pullTrackers;
+	
+	//Loop through each connection
+	for(auto mt_iter : tracker_list)
+	{
+		NCID nc_id = mt_iter.first;
+		MidiTracker *m_tracker = mt_iter.second;
+		
+		MidiEventQueue &events = m_tracker->events;
+		MidiDeviceState &note_states = m_tracker->noteStates;
+		std::unordered_multimap<MidiIndex, SampleState> &active_states = m_tracker->activeStates;
+		std::vector<SampleModFunction> &mods = m_tracker->mods;
+
+		//Add any new active states from events
+		if(!events.empty())
+		{
+			MidiEvent e = events.front();
+
+			while(e.time < g_range.end)
+			{
+				note_states.applyEvent(e);
+
+				switch(e.type)
+				{
+				case MidiEventType::NOTE_ON:
+					active_states.emplace(	e.midiIndex,
+											SampleState(getFrequency(e.midiIndex), 0.0, 0.0,
+														(double)e.velocity*amp_mult, TimeRange((Time)e.time, -1.0),
+														NoteState::ATTACKING) );
+					break;
+					
+				case MidiEventType::NOTE_OFF:
+					//Get all notes with this midi index (iterator range)
+					auto range = active_states.equal_range(e.midiIndex);
+					
+					//Turn each note off
+					for(auto iter = range.first; iter != range.second; iter++)
+						iter->second.noteOff(e.time);
+
+					break;
+				}
+			
+				events.pop_front();
+
+				if(!events.empty())
+					e = events.front();
+				else
+					break;
+				
+				//rel_t = e.fTime - HRes_Clock::getGlobalTime() + t_range.start;
+			}
+		}
+		//Notes that were inactivated on this sample (smooth tracker completed)
+		std::vector<StateMultiMap::iterator> inactivatedNotes;
+		inactivatedNotes.reserve(active_states.size());
+
+		bool add = (method == TransferMethod::ADD);
+
+		//Loop through each active (non-zero amplitude) note
+		for(auto an_iter = active_states.begin(); an_iter != active_states.end(); an_iter++)
+		{
+			const MidiIndex m_index = an_iter->first;
+
+			//Structures for this note
+			SampleState &s_state = an_iter->second;
+			SampleInfo &s_info = m_tracker->info[m_index];
+
+			//When the note ends (positive if known)
+			const Time note_end = s_state.range.end;
+			//Time value at the current sample (seconds)
+			Time t = ((s_state.started || s_state.range.start < g_range.start) ? g_range.start : s_state.range.start);
+			
+			//Loop through each sample
+			s_time	s = (s_time)floor((t - g_range.start)*(Time)sampleRate),
+					c_offset = s % AUDIO_CHUNK_SIZE;
+			c_time	c = s*chunk_size_inv;
+
+			AudioVelChunk *chunk = output_data;
+			std::vector<AudioVelSample> *chunk_data = chunk->getDataRef();
+
+			chunk->seed = (add ? chunk->seed : 0) + s_state.lastSample;
+
+			for(; s < chunk->getSize(); s++)
+			{
+				//Switch to releasing if note ends on this sample
+				if(note_end > 0.0 && t >= note_end && s_state.state < NoteState::RELEASING)
+					s_state.noteReleased();
+
+				//Apply mods (m) to info (in order)
+				for(auto m : mods)
+					m(s_state, s_info, t);
+
+				//Sample value --> returns whether the note is finished
+				if(sample(s_state, s_info, chunk_data->at(c_offset), add))
+				{
+					//Deactivate note and break
+					inactivatedNotes.push_back(an_iter);
+					break;
+				}
+
+				//Increment other stuff
+				bool chunk_wrap = (++c_offset >= AUDIO_CHUNK_SIZE);
+				if(chunk_wrap)
+				{
+					//chunk->updateChunkStep();
+					c_offset = 0;
+					c++;
+				}
+				t += sample_rate_inv;
+			}
+			add = true;
+		}
+
+		//Remove any inactivated notes
+		for(auto iter : inactivatedNotes)
+			active_states.erase(iter);
+	}
+	
+	output_data->updateChunkStep();
+
+	return true;
+}
+
+/*
+bool RenderNode::render(NoteSampleFunction &sample, AudioVelChunk **chunk, const TimeRange &t_range, const TimeRange &g_range, const ChunkRange &c_range, TransferMethod method)
 {
 	//AStatus status;
 	AudioVelChunk **output_data = chunk;//&activeChunk;//&pRenderChunk;
@@ -242,9 +490,9 @@ bool RenderNode::render(NoteSampleFunction &sample, AudioVelChunk **chunk, const
 		{
 
 			MidiEvent e = events.front();
-			while(e.fTime < t_range.end)
+			//Time rel_t = e.fTime - g_range.start + t_range.start;
+			while(e.fTime < g_range.end)
 			{
-
 				note_states.applyEvent(e);
 
 				switch(e.type)
@@ -280,11 +528,9 @@ bool RenderNode::render(NoteSampleFunction &sample, AudioVelChunk **chunk, const
 					e = events.front();
 				else
 					break;
-
-				//j++;
+				
+				//rel_t = e.fTime - HRes_Clock::getGlobalTime() + t_range.start;
 			}
-			//Remove events that have been handled
-			//events.erase(events.begin(), events.begin() + j);
 		}
 		//Notes that were inactivated on this sample (smooth tracker completed)
 		std::vector<StateMultiMap::iterator> inactivatedNotes;
@@ -304,10 +550,10 @@ bool RenderNode::render(NoteSampleFunction &sample, AudioVelChunk **chunk, const
 			//When the note ends (positive if known)
 			const Time note_end = s_state.range.end;
 			//Time value at the current sample (seconds)
-			Time t = ((s_state.started || s_state.range.start < t_range.start) ? t_range.start : s_state.range.start);
+			Time t = ((s_state.started || s_state.range.start < g_range.start) ? g_range.start : s_state.range.start);
 			
 			//Loop through each sample
-			s_time	s = (s_time)floor((t - t_range.start)*(Time)sampleRate),
+			s_time	s = (s_time)floor((t - g_range.start)*(Time)sampleRate),
 					c_offset = s % AUDIO_CHUNK_SIZE;
 			c_time	c = s*chunk_size_inv;
 
@@ -368,229 +614,378 @@ bool RenderNode::render(NoteSampleFunction &sample, AudioVelChunk **chunk, const
 
 
 
-	/*
-	bool add_outer = (method == TransferMethod::ADD);
 	
-	//For each connection
-	for(auto mt_iter : trackers)
+	//bool add_outer = (method == TransferMethod::ADD);
+	//
+	////For each connection
+	//for(auto mt_iter : trackers)
+	//{
+	//	NCID nc_id = mt_iter.first;
+	//	MidiTracker *m_tracker = mt_iter.second;
+	//	
+	//	MidiEventList &events = m_tracker->events;
+	//	MidiDeviceState &note_states = m_tracker->noteStates;
+	//	std::unordered_multimap<MidiIndex, SampleState> &active_states = m_tracker->activeStates;
+	//	std::vector<SampleModFunction> &mods = m_tracker->mods;
+
+	//	//Add any new active states from events
+	//	unsigned int j = 0;
+	//	for(auto e : events)
+	//	{
+	//		if(e.time < end_time)
+	//		{
+	//			note_states.applyEvent(e);
+	//			MidiIndex m_index = e.midiIndex;
+
+	//			switch(e.type)
+	//			{
+	//			case MidiEventType::NOTE_ON:
+	//				//Add SampleState of new note to activeStates
+	//				active_states.emplace(	m_index,
+	//										SampleState(getFrequency(m_index), 0.0, 0.0,
+	//													(double)e.velocity*amp_mult, TimeRange(e.time, -1.0),
+	//													NoteState::ATTACKING) );
+	//				break;
+	//				
+	//			case MidiEventType::NOTE_OFF:
+	//				//Get all notes with this midi index (iterator range)
+	//				auto range = active_states.equal_range(m_index);
+
+	//				//Set each note's off time
+	//				for(auto iter = range.first; iter != range.second; iter++)
+	//					iter->second.noteOff(e.time);
+
+	//				break;
+	//			}
+
+	//			j++;
+	//		}
+	//		else
+	//			break;
+	//	}
+	//	//Remove events that have been handled
+	//	events.erase(events.begin(), events.begin() + j);
+	//	
+	//	//Notes that were inactivated on this sample (smooth tracker completed)
+	//	std::vector<StateMultiMap::iterator> inactivated_notes;
+	//	inactivated_notes.reserve(active_states.size());
+
+	//	double	t = start_time;
+	//	c_time	chunk = 0;
+	//	s_time	c_offset = 0;
+
+	//	//For each sample (s)
+	//	for(register s_time s = 0; s < num_samples; s++)
+	//	{
+	//		AudioSample &p_out_s = output_data[chunk]->data[c_offset];
+	//		double out_s = add_outer*p_out_s;
+
+	//		bool add_inner = add_outer;
+	//		
+	//		for(auto ss_iter = active_states.begin(); ss_iter != active_states.end(); ss_iter++)
+	//		{
+	//			SampleState &s_state = ss_iter->second;
+
+	//			if(s_state.state != NoteState::DONE)
+	//			{
+	//				SampleInfo &s_info = m_tracker->info[ss_iter->first];
+
+	//				//Switch to releasing if note ends on this sample
+	//				s_state.state = (	(t < s_state.range.end || s_state.range.end <= 0.0) ?
+	//									s_state.state : NoteState::RELEASING );
+
+	//				//Apply mods (m) to info (in order)
+	//				for(auto m : mods)
+	//					m(s_state, s_info, t);
+
+	//				//Sample value
+	//				if(sample(s_state, s_info, out_s, add_inner))
+	//					//Note completely finished
+	//					inactivated_notes.push_back(ss_iter);
+
+	//				add_inner = true;
+	//			}
+	//		}
+
+	//		//Set output data
+	//		p_out_s = (AudioSample)((out_s < AUDIO_MAX_AMPLITUDE) ? out_s : AUDIO_MAX_AMPLITUDE);
+
+	//		//Increment other stuff
+	//		bool chunk_wrap = (++c_offset >= AUDIO_CHUNK_SIZE);
+	//		c_offset *= !chunk_wrap;
+	//		chunk += chunk_wrap;
+	//		
+	//		t += sample_rate_inv;
+	//	}
+	//	
+	//	//Remove notes that are finished
+	//	for(auto iter : inactivated_notes)
+	//		active_states.erase(iter);
+
+	//	add_outer = true;
+	//}
+	
+
+
+
+
+
+
+
+
+
+
+	//
+	////(Definitely slowest one)//
+	////For each connection
+	//for(auto mt_iter : trackers)
+	//{
+	//	NCID nc_id = mt_iter.first;
+	//	MidiTracker *m_tracker = mt_iter.second;
+	//	
+	//	MidiEventList &events = m_tracker->events;
+	//	MidiDeviceState &note_states = m_tracker->noteStates;
+	//	std::unordered_multimap<MidiIndex, SampleState> &activeStates = m_tracker->activeStates;
+	//	std::vector<SampleModFunction> &mods = m_tracker->mods;
+	//	
+	//	c_time chunk = 0;
+	//	s_time c_offset = 0;
+	//	double	t = start_time;
+	//	//For each sample (s)
+	//	for(s_time s = 0; s < num_samples; s++)
+	//	{
+	//		bool add = (method == TransferMethod::ADD);
+	//		AudioSample &p_out_s = output_data[chunk]->data[c_offset];
+	//		double out_s = 0.0;
+	//		
+	//		//Apply each event that occurred since the last sample to note state
+	//		unsigned int j = 0;
+	//		for(auto e : events)
+	//		{
+	//			if(e.time > t)
+	//				break;
+	//			else
+	//			{
+	//				note_states.applyEvent(e);
+
+	//				switch(e.type)
+	//				{
+	//				case MidiEventType::NOTE_ON:
+	//					//Add SampleState of new note to activeStates
+	//					activeStates.emplace(e.midiIndex, SampleState(	getFrequency(e.midiIndex), 0.0, 0.0,
+	//																	(double)e.velocity*amp_mult,
+	//																	NoteState::ATTACKING) );
+	//					
+	//					//std::cout << "VELOCITY --> " << (double)e.velocity*amp_mult << "\n";
+
+	//					break;
+	//					
+	//				case MidiEventType::NOTE_OFF:
+	//					//Get all notes with this midi index (iterator range)
+	//					auto range = activeStates.equal_range(e.midiIndex);
+
+	//					//Make sure each one is releasing (since note is now off)
+	//					for(auto iter = range.first; iter != range.second; iter++)
+	//						iter->second.noteOff();
+
+	//					break;
+	//				}
+
+	//				j++;
+	//			}
+	//		}
+	//		//Remove events that have been handled
+	//		events.erase(events.begin(), events.begin() + j);
+	//	
+	//		//Notes that were inactivated on this sample (smooth tracker completed)
+	//		std::vector<StateMultiMap::iterator> inactivatedNotes;
+
+	//		//For each active note
+	//		for(auto ss_iter = activeStates.begin(); ss_iter != activeStates.end(); ss_iter++)
+	//		{
+	//			MidiIndex m_index = ss_iter->first;
+
+	//			//Continue rendering note
+	//			//MidiNoteState *key_state = &note_states.keyStates[m_index];
+	//			SampleInfo &si = m_tracker->info[m_index];
+	//			SampleState &ss = ss_iter->second;
+
+	//			//Apply mods (m) to info (in order)
+	//			for(auto m : mods)
+	//				m(ss, si, t);
+
+	//			//Sample value
+	//			if(sample(ss, si, out_s, true))
+	//				//Note completely finished
+	//				inactivatedNotes.push_back(ss_iter);
+	//		}
+
+	//		for(auto iter : inactivatedNotes)
+	//			activeStates.erase(iter);
+	//	
+	//		p_out_s = p_out_s*((AudioSample)add) + (AudioSample)out_s;
+	//		add = true;
+	//		
+	//		//Update 
+	//		t += sample_rate_inv;
+
+	//		bool chunk_wrap = (++c_offset >= AUDIO_CHUNK_SIZE);
+	//		c_offset *= !chunk_wrap;
+	//		chunk += chunk_wrap;
+	//	}
+	//}
+	//
+	
+	return true;
+}
+*/
+
+
+bool RenderNode::renderUpTo(NoteSampleFunction &sample, Time g_time)
+{
+	if(g_time <= renderTime)
+		return false;
+
+	AudioVelChunk	*chunk = activeChunk;
+
+	const double	sample_rate_inv = 1.0/(double)sampleRate,
+					chunk_size_inv = 1.0/(double)chunk->getSize(),
+					amp_mult = ((double)AUDIO_MAX_AMPLITUDE*(1.0/127.0));	//Scales a midi velocity to an actual amplitude
+
+	const Time	chunk_length = (Time)chunk->getSize()*sample_rate_inv;
+
+	//Clamp range within current active chunk
+	TimeRange	t_range(renderTime,  min(g_time, chunkStart + chunk_length)),
+				rel_t_range(t_range.start - chunkStart, t_range.end - chunkStart);
+	
+	SampleRange	s_range((s_time)floor(rel_t_range.start*(Time)sampleRate),	//renderSample
+						(s_time)floor(rel_t_range.end*(Time)sampleRate));
+
+	bool chunk_overlap = (g_time >= chunkStart + chunk_length);
+
+	//Zero the render range
+	//for(s_time s = s_range.start; s < s_range.end; s++)
+	//	(*chunk)[s] = 0;
+	
+	bool add = true;
+	
+	//Loop through each pushed connection
+	for(auto mt_iter : pushTrackers)
 	{
 		NCID nc_id = mt_iter.first;
 		MidiTracker *m_tracker = mt_iter.second;
 		
-		MidiEventList &events = m_tracker->events;
+		MidiEventQueue &events = m_tracker->events;
 		MidiDeviceState &note_states = m_tracker->noteStates;
 		std::unordered_multimap<MidiIndex, SampleState> &active_states = m_tracker->activeStates;
 		std::vector<SampleModFunction> &mods = m_tracker->mods;
 
+		//Time t = t_range.start;
+
 		//Add any new active states from events
-		unsigned int j = 0;
-		for(auto e : events)
+		if(!events.empty())
 		{
-			if(e.time < end_time)
+			MidiEvent e = events.front();
+
+			while(e.time < g_time)
 			{
 				note_states.applyEvent(e);
-				MidiIndex m_index = e.midiIndex;
 
 				switch(e.type)
 				{
 				case MidiEventType::NOTE_ON:
-					//Add SampleState of new note to activeStates
-					active_states.emplace(	m_index,
-											SampleState(getFrequency(m_index), 0.0, 0.0,
-														(double)e.velocity*amp_mult, TimeRange(e.time, -1.0),
+					active_states.emplace(	e.midiIndex,
+											SampleState(getFrequency(e.midiIndex), 0.0, 0.0,
+														(double)e.velocity*amp_mult, TimeRange((Time)e.time, -1.0),
 														NoteState::ATTACKING) );
 					break;
 					
 				case MidiEventType::NOTE_OFF:
 					//Get all notes with this midi index (iterator range)
-					auto range = active_states.equal_range(m_index);
-
-					//Set each note's off time
+					auto range = active_states.equal_range(e.midiIndex);
+					
+					//Turn each note off
 					for(auto iter = range.first; iter != range.second; iter++)
 						iter->second.noteOff(e.time);
 
 					break;
 				}
-
-				j++;
-			}
-			else
-				break;
-		}
-		//Remove events that have been handled
-		events.erase(events.begin(), events.begin() + j);
-		
-		//Notes that were inactivated on this sample (smooth tracker completed)
-		std::vector<StateMultiMap::iterator> inactivated_notes;
-		inactivated_notes.reserve(active_states.size());
-
-		double	t = start_time;
-		c_time	chunk = 0;
-		s_time	c_offset = 0;
-
-		//For each sample (s)
-		for(register s_time s = 0; s < num_samples; s++)
-		{
-			AudioSample &p_out_s = output_data[chunk]->data[c_offset];
-			double out_s = add_outer*p_out_s;
-
-			bool add_inner = add_outer;
 			
-			for(auto ss_iter = active_states.begin(); ss_iter != active_states.end(); ss_iter++)
-			{
-				SampleState &s_state = ss_iter->second;
+				events.pop_front();
 
-				if(s_state.state != NoteState::DONE)
-				{
-					SampleInfo &s_info = m_tracker->info[ss_iter->first];
-
-					//Switch to releasing if note ends on this sample
-					s_state.state = (	(t < s_state.range.end || s_state.range.end <= 0.0) ?
-										s_state.state : NoteState::RELEASING );
-
-					//Apply mods (m) to info (in order)
-					for(auto m : mods)
-						m(s_state, s_info, t);
-
-					//Sample value
-					if(sample(s_state, s_info, out_s, add_inner))
-						//Note completely finished
-						inactivated_notes.push_back(ss_iter);
-
-					add_inner = true;
-				}
-			}
-
-			//Set output data
-			p_out_s = (AudioSample)((out_s < AUDIO_MAX_AMPLITUDE) ? out_s : AUDIO_MAX_AMPLITUDE);
-
-			//Increment other stuff
-			bool chunk_wrap = (++c_offset >= AUDIO_CHUNK_SIZE);
-			c_offset *= !chunk_wrap;
-			chunk += chunk_wrap;
-			
-			t += sample_rate_inv;
-		}
-		
-		//Remove notes that are finished
-		for(auto iter : inactivated_notes)
-			active_states.erase(iter);
-
-		add_outer = true;
-	}
-	*/
-
-
-
-
-
-
-
-
-
-
-	/*
-	//(Definitely slowest one)//
-	//For each connection
-	for(auto mt_iter : trackers)
-	{
-		NCID nc_id = mt_iter.first;
-		MidiTracker *m_tracker = mt_iter.second;
-		
-		MidiEventList &events = m_tracker->events;
-		MidiDeviceState &note_states = m_tracker->noteStates;
-		std::unordered_multimap<MidiIndex, SampleState> &activeStates = m_tracker->activeStates;
-		std::vector<SampleModFunction> &mods = m_tracker->mods;
-		
-		c_time chunk = 0;
-		s_time c_offset = 0;
-		double	t = start_time;
-		//For each sample (s)
-		for(s_time s = 0; s < num_samples; s++)
-		{
-			bool add = (method == TransferMethod::ADD);
-			AudioSample &p_out_s = output_data[chunk]->data[c_offset];
-			double out_s = 0.0;
-			
-			//Apply each event that occurred since the last sample to note state
-			unsigned int j = 0;
-			for(auto e : events)
-			{
-				if(e.time > t)
-					break;
+				if(!events.empty())
+					e = events.front();
 				else
-				{
-					note_states.applyEvent(e);
-
-					switch(e.type)
-					{
-					case MidiEventType::NOTE_ON:
-						//Add SampleState of new note to activeStates
-						activeStates.emplace(e.midiIndex, SampleState(	getFrequency(e.midiIndex), 0.0, 0.0,
-																		(double)e.velocity*amp_mult,
-																		NoteState::ATTACKING) );
-						
-						//std::cout << "VELOCITY --> " << (double)e.velocity*amp_mult << "\n";
-
-						break;
-						
-					case MidiEventType::NOTE_OFF:
-						//Get all notes with this midi index (iterator range)
-						auto range = activeStates.equal_range(e.midiIndex);
-
-						//Make sure each one is releasing (since note is now off)
-						for(auto iter = range.first; iter != range.second; iter++)
-							iter->second.noteOff();
-
-						break;
-					}
-
-					j++;
-				}
+					break;
+				
+				//rel_t = e.fTime - HRes_Clock::getGlobalTime() + t_range.start;
 			}
-			//Remove events that have been handled
-			events.erase(events.begin(), events.begin() + j);
-		
-			//Notes that were inactivated on this sample (smooth tracker completed)
-			std::vector<StateMultiMap::iterator> inactivatedNotes;
+		}
 
-			//For each active note
-			for(auto ss_iter = activeStates.begin(); ss_iter != activeStates.end(); ss_iter++)
+		//Notes that were inactivated on this sample (smooth tracker completed)
+		std::vector<StateMultiMap::iterator> inactivatedNotes;
+		inactivatedNotes.reserve(active_states.size());
+
+		//Loop through each active (non-zero amplitude) note
+		for(auto an_iter = active_states.begin(); an_iter != active_states.end(); an_iter++)
+		{
+			zeroChunk = false;
+			const MidiIndex m_index = an_iter->first;
+
+			//Structures for this note
+			SampleState &s_state = an_iter->second;
+			SampleInfo &s_info = m_tracker->info[m_index];
+
+			//When the note ends (positive if known)
+			const Time note_end = s_state.range.end;
+			//Time value at the current sample (seconds)
+			Time t = max(s_state.range.start, t_range.start);
+			s_range.start = (s_time)floor((t - chunkStart)*(Time)sampleRate);
+
+			for(s_time s = s_range.start; s < s_range.end; s++)
 			{
-				MidiIndex m_index = ss_iter->first;
-
-				//Continue rendering note
-				//MidiNoteState *key_state = &note_states.keyStates[m_index];
-				SampleInfo &si = m_tracker->info[m_index];
-				SampleState &ss = ss_iter->second;
+				//Switch to releasing if note ends on this sample
+				if(note_end > 0.0 && t >= note_end && s_state.state < NoteState::RELEASING)
+					s_state.noteReleased();
 
 				//Apply mods (m) to info (in order)
 				for(auto m : mods)
-					m(ss, si, t);
+					m(s_state, s_info, t);
 
-				//Sample value
-				if(sample(ss, si, out_s, true))
-					//Note completely finished
-					inactivatedNotes.push_back(ss_iter);
+				//Sample value --> returns whether the note is finished
+				if(sample(s_state, s_info, (*chunk)[s], add))
+				{
+					//Deactivate note and break
+					inactivatedNotes.push_back(an_iter);
+					break;
+				}
+
+				t += sample_rate_inv;
 			}
-
-			for(auto iter : inactivatedNotes)
-				activeStates.erase(iter);
-		
-			p_out_s = p_out_s*((AudioSample)add) + (AudioSample)out_s;
 			add = true;
-			
-			//Update 
-			t += sample_rate_inv;
-
-			bool chunk_wrap = (++c_offset >= AUDIO_CHUNK_SIZE);
-			c_offset *= !chunk_wrap;
-			chunk += chunk_wrap;
 		}
+
+		//Remove any inactivated notes
+		for(auto iter : inactivatedNotes)
+			active_states.erase(iter);
 	}
-	*/
 	
-	return true;
+	renderTime = t_range.end;
+	
+	if(chunk_overlap)
+	{
+		//Rotate chunks
+		chunk->updateChunkStep();
+		chunkStart = renderTime;
+
+		lastActiveChunk = activeChunk;
+		activeChunk = renderBuffer.shiftBuffer();
+
+		//Render next chunk
+		return renderUpTo(sample, g_time);
+	}
+	else
+		return true;
 }
 
 
@@ -724,7 +1119,7 @@ const AudioVelDataBuffer* RenderNode::getBuffer()
 	return &renderBuffer;
 }
 
-
+/*
 bool RenderNode::flushData(FlushPacket &info)
 {
 	bool flushed = false;
@@ -732,14 +1127,20 @@ bool RenderNode::flushData(FlushPacket &info)
 	NodeConnector	*midi_nc = connectors[INPUTS.MIDI_ID],
 					*instrument_nc = connectors[INPUTS.INSTRUMENT_ID];
 	
-	for(auto c : midi_nc->getConnections())
-	{
-		flushed |= (NodeConnector::getNC(c.first)->getNode()->flushData(info)
-					|| pushTrackers[c.first]->activeStates.size() > 0);
-	}
+	
+	//for(auto c : midi_nc->get())
+	//{
+	//	flushed |= (c.second->
+	//	//flushed |= (NodeConnector::getNC(c.first)->getNode()->flushData(info)
+	//	//			|| pushTrackers[c.first]->activeStates.size() > 0);
+	//}
+	
+	//flushed = Node::flushData(info);
 
-	//for(auto t_iter : pushTrackers)
-	//	flushed |= (t_iter.second->activeStates.size() > 0);
+	flushed = midi_nc->flushData(info);
+
+	for(auto t_iter : pushTrackers)
+		flushed |= (t_iter.second->activeStates.size() > 0) || (t_iter.second->events.size() > 0);
 
 	if(flushed)	//Propogate flush
 	{
@@ -747,8 +1148,9 @@ bool RenderNode::flushData(FlushPacket &info)
 		//const double chunk_time = (double)AUDIO_CHUNK_SIZE/(double)sampleRate;
 		c_time num_chunks = info.flushChunkRange.length();
 
-		ChunkRange cr(info.targetChunkRange);
-		TimeRange tr(info.targetTimeRange);
+		ChunkRange	cr(info.targetChunkRange);
+		TimeRange	tr(info.targetTimeRange),
+					gr(info.globalTimeRange);
 	
 		//Get waveform
 		InstrumentPacket instrument;
@@ -767,12 +1169,12 @@ bool RenderNode::flushData(FlushPacket &info)
 			if(TIME_RENDER)
 			{
 				flushed = timer.timeFunction<bool>(	std::bind(
-							&RenderNode::render, this, instrument.sampleVel, &activeChunk, tr, cr, TransferMethod::COPY, NCDir::FORWARD),
+							&RenderNode::render, this, instrument.sampleVel, &activeChunk, tr, gr, cr, TransferMethod::COPY, NCDir::FORWARD),
 														32, result);
 			}
 			else
 			{
-				flushed = render(instrument.sampleVel, &activeChunk, tr, cr, TransferMethod::COPY, NCDir::FORWARD);
+				flushed = render(instrument.sampleVel, &activeChunk, tr, gr, cr, TransferMethod::COPY, NCDir::FORWARD);
 			}
 
 			//Clear mods
@@ -781,6 +1183,9 @@ bool RenderNode::flushData(FlushPacket &info)
 				//Push rendered data
 				AudioPushPacket audio_output(&activeChunk, cr, TransferMethod::COPY);
 				flushed = connectors[OUTPUTS.AUDIO_ID]->pushData(audio_output);
+
+				//std::cout << "FLUSH:  " << info.flushTimeRange.start << ", " << info.flushTimeRange.end
+				//			<< "   GLOBAL:  " << info.globalTimeRange.start << ", " << info.globalTimeRange.end << "\n";
 			}
 	
 			nodeLock.unlock();
@@ -795,15 +1200,16 @@ bool RenderNode::flushData(FlushPacket &info)
 
 	return flushed;
 }
+*/
 
-bool RenderNode::pullData(PullPacket &output, NCID this_id)
+bool RenderNode::pullData(PullPacket &output, NCID this_id, NCID other_id)
 {
 	bool pulled = false;
 	
 	if(this_id == OUTPUTS.AUDIO_ID)	//Audio Packet
 	{
-		NodeConnector	*instrument_nc	= connectors[INPUTS.INSTRUMENT_ID],
-						*midi_nc		= connectors[INPUTS.MIDI_ID];
+		NodeConnector	*instrument_nc	= connectors[INPUTS.INSTRUMENT_ID].get(),
+						*midi_nc		= connectors[INPUTS.MIDI_ID].get();
 
 		//Check connections
 		if(midi_nc->numConnections() > 0)
@@ -812,48 +1218,65 @@ bool RenderNode::pullData(PullPacket &output, NCID this_id)
 
 			if(audio_output)
 			{
-				audio_output->method = (audio_output->method != TransferMethod::DIRECT)
-										? audio_output->method
-										: TransferMethod::COPY;	//Override (no pointer to non-transient data to give)
+				Cursor *pull_cursor = audio_output->pCursor;
 
-				//Check for pullable midi nodes
-				nodeLock.lockWait();
-				//Get midi data
-				//Pull data from each connection
-				for(auto mt_iter : pullTrackers)
+				if(pull_cursor)
 				{
-					NCID nc_id = mt_iter.first;
-					MidiTracker *m_tracker = mt_iter.second;
 
-					//Pull midi data from this connection
-					MidiPullPacket midi_data(audio_output->tRange);
-					midi_data.cRange = audio_output->range;
-					bool midi_pull = midi_nc->pullData(midi_data);
-					//if(!statusGood(status))
-					//	break;
-					if(midi_pull)
+					audio_output->method = (audio_output->method != TransferMethod::DIRECT)
+											? audio_output->method
+											: TransferMethod::COPY;	//Override (no pointer to non-transient data to give)
+				
+					bool pulled_midi = pull_cursor->isActive();
+					
+					nodeLock.lockWait();
+					//Propogate pull
+					for(auto mt_iter : pullTrackers)
 					{
-						//Update mods for this connection
-						if(m_tracker->mods.size() == 0)
-							m_tracker->mods.insert(m_tracker->mods.end(), midi_data.mods.begin(), midi_data.mods.end());
+						NCID nc_id = mt_iter.first;
+						MidiTracker *m_tracker = mt_iter.second;
 
-						updateEvents(midi_data.notes, audio_output->tRange, nc_id, NCDir::BACKWARD);
-						pulled = true;
+						//Pull midi data from this connection
+						MidiPullPacket midi_data(pull_cursor);
+
+						if(midi_nc->pullData(midi_data))
+						{
+							//Update mods for this connection
+							if(m_tracker->mods.size() == 0)
+								m_tracker->mods.insert(m_tracker->mods.end(), midi_data.mods.begin(), midi_data.mods.end());
+
+							addPulledEvents(midi_data.notes, pull_cursor->getTimeRange(), nc_id);
+
+							//updateEvents(midi_data.notes, audio_output->tRange, nc_id, NCDir::BACKWARD);
+							pulled_midi |= midi_data.notes.size() > 0;
+						}
+					}
+					nodeLock.unlock();
+
+					//Get waveform
+					InstrumentPacket instrument;
+
+					if(pulled_midi && instrument_nc->pullData(instrument))
+					{
+						const double chunk_time = (double)AUDIO_CHUNK_SIZE/(double)sampleRate;
+
+						//Render audio to output
+						//pulled = render(instrument.sampleVel, audio_output->data, audio_output->tRange, audio_output->globalTimeRange, audio_output->range, TransferMethod::COPY, NCDir::BACKWARD);
+
+						pulled = render(instrument.sampleVel, audio_output->data, audio_output->pCursor->getTimeRange(), TransferMethod::COPY, false);
+
+						pushedThisChunk = pulled;
+					
+						if(pulled)
+							activeChunk = renderBuffer.shiftBuffer();
+
+						//**audio_output->data += renderChunk;
+					}
+					else
+					{
+						pulled = false;
 					}
 				}
-				nodeLock.unlock();
-
-				//Get waveform
-				InstrumentPacket instrument;
-
-				if(pulled && instrument_nc->pullData(instrument))
-				{
-					//Render audio to output
-					pulled = render(instrument.sampleVel, audio_output->data, audio_output->tRange, audio_output->range, TransferMethod::COPY, NCDir::BACKWARD);
-					//**audio_output->data += renderChunk;
-				}
-				else
-					pulled = false;
 			}
 		}
 	}
@@ -861,7 +1284,7 @@ bool RenderNode::pullData(PullPacket &output, NCID this_id)
 	return pulled;
 }
 
-bool RenderNode::pushData(PushPacket &input, NCID this_id)
+bool RenderNode::pushData(PushPacket &input, NCID this_id, NCID other_id)
 {
 	bool pushed = false;
 	
@@ -874,31 +1297,50 @@ bool RenderNode::pushData(PushPacket &input, NCID this_id)
 		{
 			nodeLock.lockWait();
 
-			NodeConnector *nc = connectors[OUTPUTS.AUDIO_ID];
+			MidiTracker *m_tracker = pushTrackers[other_id];
+			//Update mods for this connection
+			if(m_tracker->mods.size() == 0)
+				m_tracker->mods.insert(m_tracker->mods.end(), midi_input->mods.begin(), midi_input->mods.end());
+			//else already updated
 
-			for(auto c : connectors[INPUTS.MIDI_ID]->getConnections())
-			{
-				MidiTracker *m_tracker = pushTrackers[c.first];
-				//Update mods for this connection
-				if(m_tracker->mods.size() == 0)
-					m_tracker->mods.insert(m_tracker->mods.end(), midi_input->mods.begin(), midi_input->mods.end());
-				//else already updated
-
-				//Apply pushed events
-				updateEvents(midi_input->events, c.first, NCDir::FORWARD);
-
-				pushed |= (!midi_input->events.empty());
-			}
-
-			//Wait for flush to render
+			//Apply pushed events
+			pushEvent(midi_input->event, other_id);
 
 			nodeLock.unlock();
+			pushed = true;
 		}
 	}
 
 	return pushed;
 }
 
+void RenderNode::flushEvents()
+{
+
+	//Get waveform
+	InstrumentPacket instrument;
+
+	if(connectors[INPUTS.INSTRUMENT_ID]->pullData(instrument))
+	{
+		
+		nodeLock.lockWait();
+		//renderUpTo(instrument.sampleVel, push_range.end);
+		render(instrument.sampleVel, activeChunk, globalRange, TransferMethod::COPY, true);
+		
+		nodeLock.unlock();
+
+		AudioPushPacket audio_output(activeChunk);//, lastActiveChunk, chunkStart);
+
+		connectors[OUTPUTS.AUDIO_ID]->pushData(audio_output);
+
+		//activeChunk = renderBuffer.shiftBuffer();
+
+		//nextPushChunk = activeChunk;
+	}
+
+}
+
+/*
 void RenderNode::updateDesc()
 {
 	Node::updateDesc();
@@ -907,3 +1349,4 @@ void RenderNode::updateDesc()
 	
 	desc->sampleRate = sampleRate;
 }
+*/

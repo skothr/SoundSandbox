@@ -20,7 +20,9 @@ GuiGroup::GuiGroup(const GuiGroup &other)
 { }
 
 GuiGroup::~GuiGroup()
-{ }
+{
+	members.clear();
+}
 
 void GuiGroup::copy(const GuiGroup &other)
 {
@@ -47,7 +49,8 @@ void GuiGroup::addFront(const std::vector<GuiElement*> &e_list)
 
 void GuiGroup::addBack(GuiElement *e)
 {
-	if(e)	members.insert(members.begin(), e);
+	if(e)
+		members.insert(members.begin(), e);
 }
 
 void GuiGroup::addBack(const std::vector<GuiElement*> &e_list)
@@ -201,7 +204,7 @@ void GuiGroup::updateResources() const
 		e->updateResources();
 }
 
-void GuiGroup::update(double dt) const
+void GuiGroup::update(const Time &dt) const
 {
 	//Update back to front
 	for(auto e : members)

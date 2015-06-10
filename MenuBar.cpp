@@ -2,28 +2,14 @@
 
 #include <GL/glew.h>
 
-/////MENU TREE/////
-
-MenuTree::MenuTree()
-	: label(""), clickAction(nullptr)
-{ }
-
-MenuTree::MenuTree(std::string label_, voidCallback click_action)
-	: label(label_), clickAction(click_action)
-{ }
-
-void MenuTree::addChild(const MenuTree &child)
-{
-	children.push_back(child);
-}
-
+#include "ContextWindow.h"
 
 /////MENU BAR/////
 const GuiPropFlags MenuBar::PROP_FLAGS	= PFlags::HARD_BACK | PFlags::ABSORB_SCROLL | PFlags::UNCONTAINED;
 const float MenuBar::DEFAULT_BAR_HEIGHT = 25.0f;
 const int MenuBar::TEXT_HEIGHT			= 14;
 
-MenuBar::MenuBar(ParentElement *parent_, GuiStateFlags s_flags, const MenuTree &menu, float bar_height)
+MenuBar::MenuBar(ParentElement *parent_, GuiStateFlags s_flags, const ContextTree &tree, float bar_height)
 	: GuiElement(parent_, APoint(), AVec(), GuiProps(s_flags, PROP_FLAGS)),
 		CompoundControl(GuiProps(s_flags, PROP_FLAGS)),
 		height(bar_height <= 0.0f ? DEFAULT_BAR_HEIGHT : bar_height)
@@ -36,9 +22,9 @@ MenuBar::MenuBar(ParentElement *parent_, GuiStateFlags s_flags, const MenuTree &
 	GuiStateFlags b_state(SFlags::VISIBLE | SFlags::ENABLED | SFlags::FLOATING);
 
 	int offset = 0;
-	for(unsigned int i = 0; i < menu.children.size(); i++)
+	for(unsigned int i = 0; i < tree.children.size(); i++)
 	{
-		MenuBarButton *b = new MenuBarButton(this, b_state, menu.children[i], offset, height);
+		MenuBarButton *b = new MenuBarButton(this, b_state, tree.children[i], offset, height);
 		children.push_back(b);
 		menuButtons.push_back(b);
 
@@ -91,10 +77,20 @@ void MenuBar::onMouseDown(APoint m_pos, MouseButton b, bool direct)
 	}
 }
 
-void MenuBar::closeAllMenus()
+void MenuBar::closeAllMenus(MenuBarButton *except)
 {
 	for(auto b : menuButtons)
-		b->closeMenu();
+		if(b != except)
+			b->closeMenu();
+}
+
+bool MenuBar::submenuOpen()
+{
+	for(auto b : menuButtons)
+		if(b->menuIsOpen())
+			return true;
+
+	return false;
 }
 
 void MenuBar::draw(GlInterface &gl)
@@ -113,13 +109,15 @@ void MenuBar::draw(GlInterface &gl)
 const float MenuBarButton::LABEL_SIDE_PADDING	= 15;
 const AVec MenuBarButton::PADDING				= AVec(1.0f, 2.0f);	//Horizontal padding doubled between buttons
 
-MenuBarButton::MenuBarButton(ParentElement *parent_, GuiStateFlags s_flags, const MenuTree &menu, float x_offset, float height)
+MenuBarButton::MenuBarButton(ParentElement *parent_, GuiStateFlags s_flags, const ContextTree &tree, float x_offset, float height)
 	: GuiElement(parent_, APoint(x_offset, 0.0f), AVec(0.0f, height), GuiProps(s_flags, MenuBar::PROP_FLAGS)),
 		CompoundControl(GuiProps(s_flags, MenuBar::PROP_FLAGS)),
-		topMenu(dynamic_cast<MenuBar*>(parent_))
+		menu(dynamic_cast<MenuBar*>(parent_))
 {
-	label = new Label(nullptr, APoint(), s_flags, menu.label, MenuBar::TEXT_HEIGHT);
-	list = new MenuList(this, topMenu, APoint(0.0f, height), (SFlags::ENABLED | SFlags::FLOATING), menu.children);
+	Window *parent_window = parent->getTopWindow();
+
+	label = new Label(this, APoint(0.0f, 0.0f), s_flags, tree.label, MenuBar::TEXT_HEIGHT);
+	list = new ContextWindow(this, parent_window, nullptr, parent_window->getClientPos() + getPos() + AVec(0.0f, height), tree.children, (SFlags::ENABLED | SFlags::FLOATING));
 
 	setWidth(label->getSize().x + 2.0f*(LABEL_SIDE_PADDING + PADDING.x));
 	label->centerAround(APoint(size*(1.0f/2.0f)));
@@ -150,7 +148,12 @@ void MenuBarButton::onMouseDown(APoint m_pos, MouseButton b, bool direct)
 	if(direct)
 	{
 		toggleMenu();
+		//openMenu();
 	}
+	//else
+	//{
+	//	closeMenu();
+	//}
 }
 
 void MenuBarButton::onMouseUp(APoint m_pos, MouseButton b, bool direct)
@@ -164,6 +167,15 @@ void MenuBarButton::onMouseUp(APoint m_pos, MouseButton b, bool direct)
 	}
 }
 
+void MenuBarButton::onMouseMove(APoint m_pos, AVec d_pos, bool direct)
+{
+	if(direct && menu->submenuOpen())
+	{
+		openMenu();
+		//setFocus(true);
+		//getTopWindow()->setFocus(true);
+	}
+}
 
 void MenuBarButton::drawBackground(GlInterface &gl)
 {
@@ -195,7 +207,7 @@ void MenuBarButton::setDefaultBg()
 
 void MenuBarButton::openMenu()
 {
-	topMenu->closeAllMenus();
+	menu->closeAllMenus(this);
 
 	menuOpen = true;
 	//
@@ -213,8 +225,7 @@ void MenuBarButton::closeMenu()
 
 	setBgStateColor(Color(0.3f, 0.3f, 0.3f, 1.0f), CS::NONE);
 
-	//Close all submenus and hide list items
-	list->closeMenus();
+	//Hide context list
 	list->hide();
 }
 
@@ -229,6 +240,7 @@ bool MenuBarButton::menuIsOpen() const
 	return menuOpen;
 }
 
+
 void MenuBarButton::draw(GlInterface &gl)
 {
 	if(isolateViewport(gl, false))	//Dont clamp children
@@ -241,7 +253,7 @@ void MenuBarButton::draw(GlInterface &gl)
 }
 
 
-
+/*
 /////MENU LIST/////
 
 MenuList::MenuList(ParentElement *parent_, MenuBar *top_menu, APoint a_pos, GuiStateFlags s_flags, const std::vector<MenuTree> &menu_items)
@@ -286,6 +298,15 @@ void MenuList::closeMenus()
 {
 	for(auto item : listItems)
 		item->closeMenu();
+}
+
+bool MenuList::submenuOpen()
+{
+	for(auto item : listItems)
+		if(item->menuIsOpen())
+			return true;
+
+	return false;
 }
 
 void MenuList::draw(GlInterface &gl)
@@ -368,6 +389,16 @@ void MenuListItem::onMouseUp(APoint m_pos, MouseButton b, bool direct)
 	//			clickAction();
 	//	}
 	//}
+}
+
+void MenuListItem::onMouseMove(APoint m_pos, AVec d_pos, bool direct)
+{
+	if(direct && parentList->submenuOpen())
+	{
+		parentList->closeMenus();
+		openMenu();
+		inFocus = true;
+	}
 }
 
 void MenuListItem::onSizeChanged(AVec d_size)
@@ -459,3 +490,5 @@ void MenuListItem::draw(GlInterface &gl)
 		restoreViewport(gl);
 	}
 }
+
+*/

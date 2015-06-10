@@ -9,7 +9,7 @@ Container::Container(GuiProps flags)
 Container::~Container()
 { }
 
-void Container::update(double dt)
+void Container::update(const Time &dt)
 {
 	ParentElement::update(dt);
 	ActiveElement::update(dt);

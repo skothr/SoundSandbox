@@ -44,7 +44,7 @@ public:
 	
 	virtual void onMouseDown(APoint m_pos, MouseButton b) override;
 	
-	//virtual void update(double dt) override;
+	//virtual void update(const Time &dt) override;
 
 	void drawData(GlInterface &gl);
 	void drawDataVel(GlInterface &gl);

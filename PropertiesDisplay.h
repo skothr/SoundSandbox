@@ -8,6 +8,9 @@
 #include "Buttons.h"
 #include "Checkbox.h"
 
+#include <memory>
+#include <vector>
+
 //class TimeMapNode;
 
 class AudioDataDisplay;
@@ -32,7 +35,7 @@ private:
 	Node *activeNode = nullptr;
 	
 	//ScrollArea *scroll = nullptr;
-	std::vector<GuiElement*> displays;
+	std::vector<std::unique_ptr<PropDisplay>> displays;
 
 	//Updates children elements to reflect current active node
 	void updateDisplay();
@@ -54,8 +57,8 @@ public:
 class PropDisplay : public ScrollArea
 {
 protected:
-	Node *node = nullptr;
-	Label titleLabel;
+	Node	*node = nullptr;
+	Label	*titleLabel = nullptr;
 
 	void setTitle(std::string title);
 	
@@ -76,33 +79,60 @@ public:
 
 
 //Displays properties for an AudioTrackNode
-class AudioTrackPropDisplay : public PropDisplay
+class StaticAudioBufferPropDisplay : public PropDisplay
 {
 private:
 	ProjectTrackDisplay		*trackDisp = nullptr;
-	ImageButton				recordToggle;
+	Checkbox				displayCheck,
+							recordCheck;
+
+public:
+	StaticAudioBufferPropDisplay(ParentElement *parent_, APoint a_pos, AVec a_size, ProjectTrackDisplay *ptd);
+	virtual ~StaticAudioBufferPropDisplay();
+
+	void updateRecord();
+	void displayChanged();
+	bool isRecording() const;
+};
+
+//Displays properties for an AudioTrackNode
+class DynamicAudioBufferPropDisplay : public PropDisplay
+{
+private:
+	ProjectTrackDisplay		*trackDisp = nullptr;
 	Checkbox				displayCheck;
 
 public:
-	AudioTrackPropDisplay(ParentElement *parent_, APoint a_pos, AVec a_size, ProjectTrackDisplay *ptd);
-	virtual ~AudioTrackPropDisplay() = default;
+	DynamicAudioBufferPropDisplay(ParentElement *parent_, APoint a_pos, AVec a_size, ProjectTrackDisplay *ptd);
+	virtual ~DynamicAudioBufferPropDisplay() = default;
 
-	void toggleRecord();
 	void displayChanged();
 };
 
 //Displays properties for a MidiTrackNode
-class MidiTrackPropDisplay : public PropDisplay
+class StaticMidiBufferPropDisplay : public PropDisplay
 {
 private:
 	ProjectTrackDisplay		*trackDisp = nullptr;
-	ImageButton				recordToggle;
+	Checkbox				recordCheck;
 
 public:
-	MidiTrackPropDisplay(ParentElement *parent_, APoint a_pos, AVec a_size, ProjectTrackDisplay *ptd);
-	virtual ~MidiTrackPropDisplay() = default;
+	StaticMidiBufferPropDisplay(ParentElement *parent_, APoint a_pos, AVec a_size, ProjectTrackDisplay *ptd);
+	virtual ~StaticMidiBufferPropDisplay() = default;
 	
-	void toggleRecord();
+	void updateRecord();
+	bool isRecording() const;
+};
+
+//Displays properties for a MidiTrackNode
+class DynamicMidiBufferPropDisplay : public PropDisplay
+{
+private:
+	ProjectTrackDisplay		*trackDisp = nullptr;
+
+public:
+	DynamicMidiBufferPropDisplay(ParentElement *parent_, APoint a_pos, AVec a_size, ProjectTrackDisplay *ptd);
+	virtual ~DynamicMidiBufferPropDisplay() = default;
 };
 
 //Displays properties for an AudioModBufferNode
@@ -147,6 +177,19 @@ private:
 public:
 	SpeakerPropDisplay(ParentElement *parent_, APoint a_pos, AVec a_size);
 	virtual ~SpeakerPropDisplay();
+	
+	virtual void update() override;
+};
+
+//Displays properties for a MicrophoneNode
+class MicrophonePropDisplay : public PropDisplay
+{
+private:
+	AudioDataDisplay *bufferDisp = nullptr;
+
+public:
+	MicrophonePropDisplay(ParentElement *parent_, APoint a_pos, AVec a_size);
+	virtual ~MicrophonePropDisplay();
 	
 	virtual void update() override;
 };

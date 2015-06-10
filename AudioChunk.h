@@ -6,6 +6,7 @@
 
 class AudioAmpChunk;
 class AudioVelChunk;
+class AudioData;
 
 class AudioChunk
 {
@@ -67,6 +68,9 @@ public:
 	//const AudioAmpChunk& operator+(const AudioVelChunk &rhs) const;
 	AudioAmpChunk& operator-=(const AudioVelChunk &rhs);
 	//const AudioAmpChunk& operator-(const AudioVelChunk &rhs) const;
+
+	AudioSample& operator[](unsigned int s_index);
+	const AudioSample& operator[](unsigned int s_index) const;
 	
 	friend class AudioData;
 	friend class AudioAmpData;
@@ -118,6 +122,9 @@ public:
 	//const AudioVelChunk& operator+(const AudioAmpChunk &rhs) const;
 	//AudioVelChunk& operator-=(const AudioAmpChunk &rhs);
 	//const AudioVelChunk& operator-(const AudioAmpChunk &rhs) const;
+	
+	AudioVelSample& operator[](unsigned int s_index);
+	const AudioVelSample& operator[](unsigned int s_index) const;
 
 	friend class AudioData;
 	friend class AudioVelData;

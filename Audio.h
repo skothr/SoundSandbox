@@ -4,7 +4,8 @@
 #include "Timing.h"
 
 //Determines the size of an audio chunk.
-extern s_time AUDIO_CHUNK_SIZE;
+extern s_time	AUDIO_CHUNK_SIZE,
+				DEFAULT_SAMPLE_RATE;
 //Determines the cutoff for audio amplitude (value of a sample)
 extern float AUDIO_MAX_AMPLITUDE;
 

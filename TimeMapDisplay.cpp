@@ -9,7 +9,7 @@
 #include "AudioDataDisplay.h"
 #include "MidiDataDisplay.h"
 
-#include "IONodes.h"
+//#include "IONodes.h"
 
 /////TIME MAP DISPLAY/////
 const float TimeMapDisplay::SAMPLES_PER_PIXEL = 100.0f;	//Samples per pixel at zoom = 1.0f
@@ -272,7 +272,7 @@ void TimeMapDisplay::onScroll(APoint m_pos, AVec d_scroll, bool direct)
 	}
 }
 
-void TimeMapDisplay::update(double dt)
+void TimeMapDisplay::update(const Time &dt)
 {
 	if(node)// && node->isPlaying())
 	{

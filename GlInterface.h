@@ -14,6 +14,9 @@
 
 typedef unsigned int GLenum;
 
+class ShaderProgram;
+class WindowWin32;
+
 //Description of a transform space
 struct GuiSpace
 {
@@ -54,8 +57,6 @@ private:
 	//Transforms the given vector by the top trans_inv matrix (view -> current absolute)
 	Vec3f viewToCurr(const Vec3f &v) const;
 
-	void setViewport(const ViewRect &view);
-
 public:
 	GlInterface(const ViewRect &base_view);
 	~GlInterface() = default;
@@ -69,6 +70,8 @@ public:
 	void transformSpace(const Mat3f &absoluteToVirtual, const Mat3f &virtualToAbsolute);
 	//Restores the last space (goes one level up)
 	void restoreLast();
+
+	void setViewport(const ViewRect &view);
 
 
 	ViewRect getCurrView() const;

@@ -6,70 +6,7 @@
 class Project;
 class Sandbox;
 class SystemPath;
-class FileSystem;
-
-class Path
-{
-	friend class FileSystem;
-
-private:
-	//The path this class represents (soted as internal format)
-	std::wstring path;
-
-public:
-	Path();
-	Path(std::wstring p);
-	Path(std::string p);
-	//Path(const std::wstring &p);
-	//Path(const std::string &p);
-	//Path(const char* &p);
-	//Path(const wchar_t* &p);
-	//Path(const char[] p);
-	Path(const Path &p);
-
-	//TODO: Task in const references for each possible type of string, instead of using string values
-
-	Path& operator=(const Path &other);
-	Path& operator=(std::wstring p);
-	Path& operator=(std::string p);
-	//Path& operator=(const char* &p);
-	//Path& operator=(const wchar_t* &p);
-
-	Path& operator+=(const Path &rhs);
-	Path& operator+=(std::wstring rhs);
-	Path& operator+=(std::string rhs);
-	//Path& operator+=(const char* &p);
-	//Path& operator+=(const wchar_t* &p);
-	
-	Path operator+(const Path &rhs) const;
-	Path operator+(std::wstring rhs) const;
-	Path operator+(std::string rhs) const;
-	//Path operator+(const char* &p) const;
-	//Path operator+(const wchar_t* &p) const;
-
-	bool operator==(const Path &other) const;
-	bool operator==(std::wstring rhs) const;
-	bool operator==(std::string rhs) const;
-	//bool operator==(const char* &rhs) const;
-	//bool operator==(const wchar_t* &rhs) const;
-
-	bool operator!=(const Path &other) const;
-	bool operator!=(std::wstring rhs) const;
-	bool operator!=(std::string rhs) const;
-	//bool operator!=(const char* &rhs) const;
-	//bool operator!=(const wchar_t* &rhs) const;
-	
-	friend std::ostream& operator<<(std::ostream &os, const Path &p);
-
-	//Conversion to wstring --> returns system path
-	//operator std::wstring() const;
-	//explicit operator std::wstring() const;
-
-	//Returns path in internal format
-	std::wstring getInternal() const;
-	//Returns path in system format
-	std::wstring getSystem() const;
-};
+class Path;
 
 class FileSystem
 {
@@ -165,30 +102,30 @@ template<typename T>
 int FileSystem::writeFile(std::ofstream &out, const T &num)//, int num_bytes)
 {
 	//static const char padding[MAX_FILE_PADDING] = {0};
-	static const int t_size = sizeof(T);
 
 	//int data_bytes = (num_bytes < 0 ? t_size : num_bytes),
 	//	pad_bytes = data_bytes - t_size;
 
 	//Write given data
-	out.write((char*)&num, t_size);
+	//out.write((char*)&num, sizeof(T));
+	out.write((char*)&num, sizeof(T));
+
 	//Pad to specified number of bytes
 	//out.write(padding, pad_bytes);
 
-	return t_size;
+	return sizeof(T);
 }
 
 template<typename T>
 int FileSystem::readFile(std::ifstream &in, T &num)//, int num_bytes)
 {
 	//static const char padding[MAX_FILE_PADDING] = {0};
-	static const int t_size = sizeof(T);
 
 	//int read_bytes = (num_bytes < 0 ? sizeof(num) : num_bytes),
 
-	in.read((char*)&num, t_size);
+	in.read((char*)&num, sizeof(T));
 
-	return t_size;
+	return sizeof(T);
 }
 
 #endif	//APOLLO_FILE_SYSTEM_H

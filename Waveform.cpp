@@ -22,13 +22,14 @@ Waveform::Waveform()
 	//cacheWaveform();
 	//fftTest();
 }
+/*
 Waveform::Waveform(const WaveformDesc &wave_desc)
 {
 	points.reserve(wave_desc.points.size());
 	points.insert(points.end(), wave_desc.points.begin(), wave_desc.points.end());
 	cacheWaveform();
 }
-
+*/
 void Waveform::cacheWaveform()
 {
 	cacheBetween(0, points.size() - 1);
@@ -186,7 +187,7 @@ void Waveform::clearPoints()
 	addPoint(WavePoint(1.0, 0.0, Interp::MATCH_ADJACENT));
 }
 
-const std::vector<WavePoint>* Waveform::getPoints() const
+std::vector<WavePoint>* Waveform::getPoints()
 {
 	return &points;
 }
@@ -261,6 +262,7 @@ FAudioVelSample Waveform::sampleVel(const SampleState &state) const
 				- (AudioVelSample)(state.amplitude*cache[(unsigned int)(state.lastPhase*(double)NUM_CACHE_POINTS)]));
 }
 
+/*
 void Waveform::updateDesc()
 {
 	objDesc = (objDesc ? objDesc : (ObjDesc*)(new WaveformDesc()));
@@ -270,7 +272,7 @@ void Waveform::updateDesc()
 	desc->points.reserve(points.size());
 	desc->points.insert(desc->points.end(), points.begin(), points.end());
 }
-
+*/
 
 
 

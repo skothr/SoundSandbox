@@ -6,6 +6,8 @@
 
 #include "Audio.h"
 
+#include <vector>
+
 class Waveform;
 
 
@@ -15,7 +17,7 @@ struct WaveData : public GraphData<s_time, FAudioSample>
 
 	WaveData(const FAudioSample *wave_data, int n_points);
 	virtual ~WaveData();
-	virtual void update(double dt) override;
+	virtual void update(const Time &dt) override;
 	
 	//virtual void drawData(Range<s_time> range, GlInterface &gl) const override;
 	virtual void getData(FRange range, float x_step, std::vector<GPoint> &out_data) const override;

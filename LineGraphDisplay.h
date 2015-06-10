@@ -155,7 +155,7 @@ void LineGraphDisplay<XDataType, YDataType>::drawGraph(GlInterface &gl)
 	std::vector<GPoint> p_data;
 	FRange x_range = flipX ? FRange(maxData.x - v_origin.x - v_size.x, maxData.x - v_origin.x)
 							: FRange(v_origin.x, v_origin.x + v_size.x);
-	float x_step = x_range.length()/gl_size.x;
+	float x_step = x_range.length()/gl_size.x*0.5;
 
 	if(gData)
 		gData->getData(x_range, x_step, p_data);

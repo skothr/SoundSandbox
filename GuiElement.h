@@ -1,6 +1,7 @@
 #ifndef APOLLO_GUI_ELEMENT_H
 #define APOLLO_GUI_ELEMENT_H
 
+#include "Timing.h"
 #include "Screen.h"
 #include "Color.h"
 #include "GuiProperties.h"
@@ -9,6 +10,7 @@
 
 
 class ParentElement;
+class Window;
 
 //////////
 //TODO: Allow any GuiElement to have child display elements...??
@@ -77,10 +79,14 @@ public:
 	bool detach(AttachSide side);
 	GuiElement* getAttached(AttachSide side);
 	bool isAttached(AttachSide side);
+
+	void detachAll();
 	
 	//handle --> whether the parent knows about the child
 	//TODO: Should be protected?
 	void setParent(ParentElement *new_parent, bool was_floating, bool now_floating, bool handle = true);
+	
+	Window* getTopWindow();
 
 	void setPos(APoint a_pos);
 	void setX(float new_x);
@@ -114,7 +120,7 @@ public:
 	virtual bool isolateViewport(GlInterface &gl, bool clamp = true);
 	void restoreViewport(GlInterface &gl);
 
-	virtual void update(double dt)	{ }
+	virtual void update(const Time &dt)	{ }
 	virtual void draw(GlInterface &gl) = 0;
 };
 

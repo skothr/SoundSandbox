@@ -18,7 +18,7 @@ void ParentElement::addChild(GuiElement *child, bool floating)
 	else
 		bodyChildren.addFront(child);
 
-	child->setParent(this, floating, floating, false);
+	//child->setParent(this, floating, floating, false);
 
 	onAddElement();
 }
@@ -80,7 +80,7 @@ bool ParentElement::isolateViewport(GlInterface &gl, bool clamp)
 	return visible && gl.isolateViewport(pos, size, tc ? tc->getViewOffset() : APoint(), clamp);
 }
 
-void ParentElement::update(double dt)
+void ParentElement::update(const Time &dt)
 {
 	floatingChildren.update(dt);
 	bodyChildren.update(dt);

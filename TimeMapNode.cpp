@@ -1,6 +1,8 @@
 #include "TimeMapNode.h"
 
 #include "TrackNodes.h"
+#include "NodeConnection.h"
+#include "NodePackets.h"
 
 
 /////TIME MAP NODE/////
@@ -8,13 +10,14 @@ const std::vector<NodeConnectorDesc> TimeMapNode::nc_descs =
 			{ NodeConnectorDesc(NodeData::AUDIO, IOType::DATA_INPUT, "Audio Input", "Input audio to map.", -1),
 			  NodeConnectorDesc(NodeData::AUDIO, IOType::DATA_OUTPUT, "Audio Output", "Mapped audio data.", -1) };
 
-TimeMapNode::TimeMapNode(int sample_rate)
-	: Node(NType::TIME_MAP, "Time Map Node", "Maps tracks to global time."),
+TimeMapNode::TimeMapNode(NodeGraph *parent_graph, int sample_rate)
+	: Node(parent_graph, NType::TIME_MAP, "Time Map Node", "Maps tracks to global time."),
 		sampleRate(sample_rate), cursor(sample_rate, AUDIO_CHUNK_SIZE, 1)
 {
 	initNode();
 }
 
+/*
 TimeMapNode::TimeMapNode(const TimeMapNDesc &tmn_desc)
 	: Node(*(NDesc*)&tmn_desc),
 		sampleRate(tmn_desc.sampleRate), maxBufferLength(tmn_desc.maxBufferLength),
@@ -25,6 +28,7 @@ TimeMapNode::TimeMapNode(const TimeMapNDesc &tmn_desc)
 	INPUTS.AUDIO_ID	= tmn_desc.connectors[0];
 	OUTPUTS.AUDIO_ID = tmn_desc.connectors[1];
 }
+*/
 
 void TimeMapNode::initNode()
 {
@@ -246,7 +250,7 @@ bool TimeMapNode::flushData(FlushPacket &info)
 }
 
 
-bool TimeMapNode::pullData(PullPacket &output, NCID this_id)
+bool TimeMapNode::pullData(PullPacket &output, NCID this_id, NCID other_id)
 {
 	bool pulled = false;
 	return pulled;
@@ -273,7 +277,7 @@ bool TimeMapNode::pullData(PullPacket &output, NCID this_id)
 										: TransferMethod::COPY;	//Override (no pointer to non-transient data to give)
 
 				//Calling for cursor to step, or getting data at a specific location?
-				bool step_cursor = (audio_output->range == audio_output->globalRange);
+				bool step_cursor = (TimeRange(audio_output->range) == audio_output->globalTimeRange);
 
 				if(step_cursor)
 				{
@@ -332,7 +336,7 @@ bool TimeMapNode::pullData(PullPacket &output, NCID this_id)
 	return pulled;
 }
 
-bool TimeMapNode::pushData(PushPacket &input, NCID this_id)
+bool TimeMapNode::pushData(PushPacket &input, NCID this_id, NCID other_id)
 {
 	bool pushed = false;
 	
@@ -351,6 +355,7 @@ bool TimeMapNode::pushData(PushPacket &input, NCID this_id)
 	return pushed;
 }
 
+/*
 void TimeMapNode::updateDesc()
 {
 	Node::updateDesc();
@@ -361,3 +366,4 @@ void TimeMapNode::updateDesc()
 	desc->maxBufferLength = maxBufferLength;
 	desc->cursor = *(CursorDesc*)cursor.getDesc();
 }
+*/

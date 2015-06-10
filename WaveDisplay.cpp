@@ -2,7 +2,7 @@
 
 #include "Waveform.h"
 
-/////WAVE DISPLAY/////
+/////WAVE DATA/////
 WaveData::WaveData(const FAudioSample *wave_data, int n_points)
 	: GraphData<s_time, FAudioSample>(n_points), 
 		waveData(wave_data)
@@ -11,7 +11,7 @@ WaveData::WaveData(const FAudioSample *wave_data, int n_points)
 WaveData::~WaveData()
 { }
 
-void WaveData::update(double dt)
+void WaveData::update(const Time &dt)
 {
 
 }
@@ -80,6 +80,8 @@ void WaveData::drawData(Range<s_time> range, GlInterface &gl) const
 		data_out.push_back(waveData[s]);
 }
 */
+
+
 
 /////WAVE DISPLAY/////
 const GuiPropFlags WaveDisplay::PROP_FLAGS = PFlags::HARD_BACK;

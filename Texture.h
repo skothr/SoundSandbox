@@ -9,19 +9,22 @@ private:
 	static ShaderProgram *texSP;
 	static GLuint vbID;
 
-	GLuint	texID,
-			fbID;
+	GLuint	texID = 0,
+			fbID = 0;
 	Vec2f	size;
 
 
 public:
 	Texture();
-	~Texture();
+	//Texture(const Texture &other);
+	virtual ~Texture();
+
+	Texture& operator=(const Texture &other);
 
 	void create(Vec2f a_size, void *data = nullptr);
 
 	static void loadResources();
-	static void cleanUp();
+	static void cleanup();
 	static void bind(Texture *tex);
 
 	GLuint getID();

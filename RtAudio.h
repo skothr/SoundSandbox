@@ -1,15 +1,15 @@
 /************************************************************************/
 /*! \class RtAudio
-    \brief Realtime audio i/o C++ classes.
+    \brief Time audio i/o C++ classes.
 
     RtAudio provides a common API (Application Programming Interface)
-    for realtime audio input/output across Linux (native ALSA, Jack,
+    for Time audio input/output across Linux (native ALSA, Jack,
     and OSS), Macintosh OS X (CoreAudio and Jack), and Windows
     (DirectSound, ASIO and WASAPI) operating systems.
 
     RtAudio WWW site: http://www.music.mcgill.ca/~gary/rtaudio/
 
-    RtAudio: realtime audio i/o C++ classes
+    RtAudio: Time audio i/o C++ classes
     Copyright (c) 2001-2014 Gary P. Scavone
 
     Permission is hereby granted, free of charge, to any person
@@ -111,8 +111,8 @@ static const RtAudioFormat RTAUDIO_FLOAT64 = 0x20; // Normalized between plus/mi
     open the input and/or output stream device(s) for exclusive use.
     Note that this is not possible with all supported audio APIs.
 
-    If the RTAUDIO_SCHEDULE_REALTIME flag is set, RtAudio will attempt 
-    to select realtime scheduling (round-robin) for the callback thread.
+    If the RTAUDIO_SCHEDULE_Time flag is set, RtAudio will attempt 
+    to select Time scheduling (round-robin) for the callback thread.
 
     If the RTAUDIO_ALSA_USE_DEFAULT flag is set, RtAudio will attempt to
     open the "default" PCM device when using the ALSA API. Note that this
@@ -122,7 +122,7 @@ typedef unsigned int RtAudioStreamFlags;
 static const RtAudioStreamFlags RTAUDIO_NONINTERLEAVED = 0x1;    // Use non-interleaved buffers (default = interleaved).
 static const RtAudioStreamFlags RTAUDIO_MINIMIZE_LATENCY = 0x2;  // Attempt to set stream parameters for lowest possible latency.
 static const RtAudioStreamFlags RTAUDIO_HOG_DEVICE = 0x4;        // Attempt grab device and prevent use by others.
-static const RtAudioStreamFlags RTAUDIO_SCHEDULE_REALTIME = 0x8; // Try to select realtime scheduling for callback thread.
+static const RtAudioStreamFlags RTAUDIO_SCHEDULE_Time = 0x8; // Try to select Time scheduling for callback thread.
 static const RtAudioStreamFlags RTAUDIO_ALSA_USE_DEFAULT = 0x10; // Use the "default" PCM device (ALSA only).
 
 /*! \typedef typedef unsigned long RtAudioStreamStatus;
@@ -313,7 +313,7 @@ class RtAudio
     - \e RTAUDIO_NONINTERLEAVED:    Use non-interleaved buffers (default = interleaved).
     - \e RTAUDIO_MINIMIZE_LATENCY:  Attempt to set stream parameters for lowest possible latency.
     - \e RTAUDIO_HOG_DEVICE:        Attempt grab device for exclusive use.
-    - \e RTAUDIO_SCHEDULE_REALTIME: Attempt to select realtime scheduling for callback thread.
+    - \e RTAUDIO_SCHEDULE_Time: Attempt to select Time scheduling for callback thread.
     - \e RTAUDIO_ALSA_USE_DEFAULT:  Use the "default" PCM device (ALSA only).
 
     By default, RtAudio streams pass and receive audio data from the
@@ -340,10 +340,10 @@ class RtAudio
     open the input and/or output stream device(s) for exclusive use.
     Note that this is not possible with all supported audio APIs.
 
-    If the RTAUDIO_SCHEDULE_REALTIME flag is set, RtAudio will attempt 
-    to select realtime scheduling (round-robin) for the callback thread.
-    The \c priority parameter will only be used if the RTAUDIO_SCHEDULE_REALTIME
-    flag is set. It defines the thread's realtime priority.
+    If the RTAUDIO_SCHEDULE_Time flag is set, RtAudio will attempt 
+    to select Time scheduling (round-robin) for the callback thread.
+    The \c priority parameter will only be used if the RTAUDIO_SCHEDULE_Time
+    flag is set. It defines the thread's Time priority.
 
     If the RTAUDIO_ALSA_USE_DEFAULT flag is set, RtAudio will attempt to
     open the "default" PCM device when using the ALSA API. Note that this
@@ -366,7 +366,7 @@ class RtAudio
     RtAudioStreamFlags flags;      /*!< A bit-mask of stream flags (RTAUDIO_NONINTERLEAVED, RTAUDIO_MINIMIZE_LATENCY, RTAUDIO_HOG_DEVICE, RTAUDIO_ALSA_USE_DEFAULT). */
     unsigned int numberOfBuffers;  /*!< Number of stream buffers. */
     std::string streamName;        /*!< A stream name (currently used only in Jack). */
-    int priority;                  /*!< Scheduling priority of callback thread (only used with flag RTAUDIO_SCHEDULE_REALTIME). */
+    int priority;                  /*!< Scheduling priority of callback thread (only used with flag RTAUDIO_SCHEDULE_Time). */
 
     // Default constructor.
     StreamOptions()
@@ -610,12 +610,12 @@ struct CallbackInfo {
   void *errorCallback;
   void *apiInfo;   // void pointer for API specific callback information
   bool isRunning;
-  bool doRealtime;
+  bool doTime;
   int priority;
 
   // Default constructor.
   CallbackInfo()
-  :object(0), callback(0), userData(0), errorCallback(0), apiInfo(0), isRunning(false), doRealtime(false) {}
+  :object(0), callback(0), userData(0), errorCallback(0), apiInfo(0), isRunning(false), doTime(false) {}
 };
 
 // **************************************************************** //

@@ -9,20 +9,20 @@
 #include "Keyboard.h"
 #include "Events.h"
 
-#include "Saveable.h"
+//#include "Saveable.h"
 
 #include <vector>
 #include <functional>
 #include <unordered_map>
 
-typedef std::function<AStatus(MidiEvent)> MidiCallback;
+typedef std::function<bool(MidiEvent)> MidiCallback;
 
 #define NUM_VIRTUAL_NOTES	18
 #define VIRTUAL_BASE_INDEX	60
 
 typedef int MidiPort;
 
-class MidiDevice : public Saveable
+class MidiDevice// : public Saveable
 {
 private:
 	static std::vector<MidiDevice*>						virtualDevices;
@@ -56,19 +56,20 @@ private:
 public:
 
 	MidiDevice();
-	MidiDevice(const MidiDevDesc &md_desc);
+	//MidiDevice(const MidiDevDesc &md_desc);
 	virtual ~MidiDevice();
 	
-	static AStatus initDevices();
+	static bool initDevices();
+	static void cleanupDevices();
 	static unsigned int numPorts();
-	static AStatus printDevices();
+	static bool printDevices();
 
 	//Returns current port of the device with the specified name (or -1 if it isn't currently connected)
 	static int getPort(std::string dev_name);
 
-	static AStatus keyEvent(KeyCode key, EventType key_event);
+	static bool keyEvent(KeyCode key, EventType key_event);
 	
-	AStatus init(MidiPort p, MidiCallback callback_func);
+	bool init(MidiPort p, MidiCallback callback_func);
 
 	void raiseOctave();
 	void lowerOctave();
@@ -85,7 +86,7 @@ public:
 	const MidiDeviceState* getState() const;
 	
 protected:
-	virtual void updateDesc() override;
+	//virtual void updateDesc() override;
 };
 
 #endif	//APOLLO_MIDI_DEVICE_H

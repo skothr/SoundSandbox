@@ -2,10 +2,34 @@
 #define APOLLO_WAVE_CONTROL_H
 
 #include "CompoundControl.h"
+#include "Buttons.h"
 
 class Waveform;
 class WaveDisplay;
 class ImageButton;
+
+class WaveControl;
+class WavePoint;
+
+class WavePointButton : public BaseButton
+{
+protected:
+	WaveControl *waveParent = nullptr;
+	WavePoint	*wavePoint = nullptr;
+	Waveform	*waveform = nullptr;
+
+	virtual void onDrag(APoint m_pos, AVec d_pos, bool direct) override;
+
+public:
+	WavePointButton(ParentElement *parent_, WavePoint *wave_point, Waveform *waveform_, GuiStateFlags s_flags);
+	virtual ~WavePointButton();
+	
+	static const GuiPropFlags PROP_FLAGS;
+
+	virtual void update(const Time &dt) override;
+};
+
+
 
 class WaveControl : public CompoundControl
 {
@@ -16,6 +40,8 @@ private:
 					*square		= nullptr,
 					*sawtooth	= nullptr,
 					*triangle	= nullptr;
+	
+	std::vector<WavePointButton*> buttons;
 
 public:
 	WaveControl(ParentElement *parent_, APoint a_pos, AVec a_size, GuiStateFlags s_flags, Waveform *waveform);

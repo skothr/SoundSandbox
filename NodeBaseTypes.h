@@ -6,15 +6,17 @@
 #include <vector>
 
 #include "Timing.h"
-#include "Cursor.h"
-#include "Audio.h"
-#include "MIDI.h"
-#include "AStatus.h"
 
 #include "Interpolation.h"
 
 class Waveform;
+class Cursor;
 
+class PushPacket;
+class PullPacket;
+class FlushPacket;
+
+/*
 /////TRACK NODE STUFF/////
 struct TrackPoint
 {
@@ -75,7 +77,7 @@ TrackNode<T>::TrackNode()
 
 template<typename T>
 TrackNode<T>::TrackNode(T initial_length)
-	: Node(NType::INVALID, "Null Track Node", "Unspecified"), length(initial_length), maxLength(initial_length)
+	: Node(nullptr, NType::INVALID, "Null Track Node", "Unspecified"), length(initial_length), maxLength(initial_length)
 { }
 
 template<typename T>
@@ -128,7 +130,7 @@ bool TrackNode<T>::isRecording() const
 {
 	return static_cast<bool>(pRecordCursor);
 }
-
+*/
 
 
 //Represents a Node that modifies aspects of the information that passes through it.
@@ -146,36 +148,36 @@ public:
 	//virtual NodeType getType() override { return NODE_MOD; }
 };
 
-//Represents a Node that can only be read from
-class ReadNode : public virtual Node
+//Represents a Node that imports data (e.g. microphone, read files, etc)
+class InputNode : public virtual Node
 {
 protected:
 
 public:
-	ReadNode();
-	virtual ~ReadNode() = default;
+	InputNode();
+	virtual ~InputNode() = default;
 	
 	//virtual AStatus pullData(NodePacket &output);	// = 0;
 	
 	//virtual bool canPush() override;
 
-	virtual bool pushData(PushPacket &input, NCID this_id) override
+	virtual bool pushData(PushPacket &input, NCID this_id, NCID other_id) override
 	{ return false; }
 };
 
-//Represents a Node that can only be written to
-class WriteNode : public virtual Node
+//Represents a Node that exports data (e.g. speaker, write files, etc)
+class OutputNode : public virtual Node
 {
 protected:
 
 public:
-	WriteNode();
-	virtual ~WriteNode() = default;
+	OutputNode();
+	virtual ~OutputNode() = default;
 	
 	//virtual bool canPull() override;
 	//virtual bool canFlush() override;
 
-	virtual bool pullData(PullPacket &output, NCID this_id) override
+	virtual bool pullData(PullPacket &output, NCID this_id, NCID other_id) override
 	{ return false; }
 	
 	//virtual AStatus pushData(NodePacket &input, NCID nc_id);	// = 0;

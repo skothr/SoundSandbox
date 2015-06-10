@@ -6,6 +6,43 @@
 #include <functional>
 
 
+
+
+/////WAVE POINT BUTTON/////
+const GuiPropFlags WavePointButton::PROP_FLAGS = PFlags::HARD_BACK;
+
+WavePointButton::WavePointButton(ParentElement *parent_, WavePoint *wave_point, Waveform *waveform_, GuiStateFlags s_flags)
+	: GuiElement(parent_, APoint(wave_point->x*parent_->getSize().x, wave_point->y*parent_->getSize().y), AVec(5, 5), GuiProps(s_flags, PROP_FLAGS)),
+		BaseButton(GuiProps(s_flags, PROP_FLAGS), ""),
+		waveParent((WaveControl*)parent_), wavePoint(wave_point), waveform(waveform_)
+{
+
+}
+
+WavePointButton::~WavePointButton()
+{
+
+}
+
+void WavePointButton::onDrag(APoint m_pos, AVec d_pos, bool direct)
+{
+	if(direct)
+	{
+		setPos(pos + d_pos);
+		wavePoint->x = pos.x;
+		wavePoint->y = pos.y;
+
+		waveform->cacheWaveform();
+	}
+}
+
+void WavePointButton::update(const Time &dt)
+{
+	setPos(APoint(wavePoint->x*waveParent->getSize().x, wavePoint->y*waveParent->getSize().y));
+}
+
+
+
 /////WAVE CONTROL/////
 const GuiPropFlags WaveControl::PROP_FLAGS = PFlags::HARD_BACK;
 
@@ -29,6 +66,17 @@ WaveControl::WaveControl(ParentElement *parent_, APoint a_pos, AVec a_size, GuiS
 	waveDisp->attachTo(this, AttachSide::RIGHT, 5);
 	waveDisp->attachTo(sin, AttachSide::TOP, 5);
 	waveDisp->attachTo(this, AttachSide::BOTTOM, 5);
+	
+	/*
+	std::vector<WavePoint> *points = waveform->getPoints();
+	buttons.clear();
+	buttons.reserve(points->size());
+
+	for(auto &p : *points)
+	{
+		buttons.push_back(new WavePointButton(this, &p, waveform, DEFAULT_STATE));
+	}
+	*/
 
 	//std::vector<GuiElement*> children;
 	//children.push_back(waveDisp);
@@ -72,6 +120,14 @@ void WaveControl::setWaveform(Waveform *waveform)
 	square->setClickFunction(std::bind(&Waveform::setSquare, wave));
 	sawtooth->setClickFunction(std::bind(&Waveform::setSawtooth, wave));
 	triangle->setClickFunction(std::bind(&Waveform::setTriangle, wave));
+
+	std::vector<WavePoint> *points = waveform->getPoints();
+
+	//buttons.clear();
+	//buttons.reserve(points->size());
+
+	//for(auto &p : *points)
+	//	buttons.push_back(new WavePointButton(this, &p, waveform, DEFAULT_STATE));
 
 	waveDisp->setData(wave);
 }

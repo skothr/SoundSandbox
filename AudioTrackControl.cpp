@@ -1,7 +1,8 @@
 #include "AudioTrackControl.h"
 
-#include "TrackNodes.h"
+//#include "TrackNodes.h"
 #include "AudioDataDisplay.h"
+#include "AudioBufferNode.h"
 
 #include "Cursor.h"
 
@@ -10,7 +11,7 @@
 const GuiPropFlags	AudioTrackControl::PROP_FLAGS	= PFlags::HARD_BACK;
 const AVec			AudioTrackControl::PADDING		= AVec(5.0f, 5.0f);
 
-AudioTrackControl::AudioTrackControl(ParentElement *parent_, APoint a_pos, float height, GuiStateFlags s_flags, AudioTrackNode *t_node, float samples_per_pixel)
+AudioTrackControl::AudioTrackControl(ParentElement *parent_, APoint a_pos, float height, GuiStateFlags s_flags, AudioBufferNode *t_node, float samples_per_pixel)
 	: GuiElement(parent_, a_pos, AVec(100.0f, height), GuiProps(s_flags, PROP_FLAGS)),
 		CompoundControl(GuiProps(s_flags, PROP_FLAGS)),
 		node(t_node), samplesPerPixel(samples_per_pixel)
@@ -42,7 +43,7 @@ void AudioTrackControl::setCursor(Cursor *p_cursor)
 }
 
 
-void AudioTrackControl::setTrackNode(AudioTrackNode *new_node)
+void AudioTrackControl::setTrackNode(AudioBufferNode *new_node)
 {
 	node = new_node;
 	dataDisp->setData(node->getData(), false, false, true, samplesPerPixel);

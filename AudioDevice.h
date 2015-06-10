@@ -5,7 +5,7 @@
 #include "AStatus.h"
 #include "Audio.h"
 
-#include "Saveable.h"
+#include "AudioChunk.h"
 
 #include <cinttypes>
 #include <functional>
@@ -14,28 +14,30 @@
 struct BufferDesc
 {
 	//These are constant --> callback shouldnt change them
-	const unsigned int	chunkSize,
-						sampleRate,
-						numChannels;
+	const unsigned int			chunkSize,
+								sampleRate,
+								numChannels;
 
 	//Callback should set these parameters
-	unsigned int		numChunks = 1;
-	std::vector<const AudioSample*> data;	//Each vector element is for a channel, and should point to an
-											//	array of chunkSize AudioSamples
+	unsigned int				numChunks = 1;
+	std::vector<AudioAmpChunk>	data;			//Each vector element is for a channel, and should point to an
+												//	array of chunkSize AudioSamples
 
 	BufferDesc(unsigned int chunk_size, unsigned int sample_rate, unsigned int num_channels)
-		: chunkSize(chunk_size), sampleRate(sample_rate), numChannels(num_channels), data(numChannels, nullptr)
+		: chunkSize(chunk_size), sampleRate(sample_rate), numChannels(num_channels), data(numChannels, AudioAmpChunk(chunk_size))
 	{ }
 };
 
-typedef std::function<AStatus(BufferDesc &data, double elapsed_time)> AudioCallback;
+typedef std::function<bool(BufferDesc &data, double elapsed_time)> AudioCallback;
 
-class AudioDevice : public Saveable
+
+//Base class
+class AudioDevice
 {
-private:
-	static RtAudio	*g_audioOut;
+protected:
+	static RtAudio	*g_audio;
 
-	RtAudio			*audioOut = nullptr;
+	RtAudio			*audioDev = nullptr;
 	AudioCallback	callback = nullptr;
 
 	unsigned int	deviceId = 0,
@@ -45,36 +47,67 @@ private:
 
 	std::string		name = "";
 
-	bool			playing = false;
+	bool			active = false;
 
 public:
 	AudioDevice();
-	AudioDevice(const AudioDevDesc &ad_desc);
 	virtual ~AudioDevice();
 
-	static AStatus initDevices();
+	static bool initDevices();
+	static void cleanupDevices();
 	static unsigned int numDevices();
-	static AStatus printDevices();
+	static bool printDevices();
 
 	//Returns the current id of the device with the specified name (or -1 if it isn't currently connected)
 	static int getId(std::string dev_name);
 
-	AStatus init(unsigned int device_id, unsigned int sample_rate, unsigned int chunk_size, unsigned int num_channels, AudioCallback callback_func);
-
-	static int audioCallback(void *out_buffer, void *in_buffer, unsigned int buffer_size, double stream_time, RtAudioStreamStatus status, void *p_device);
+	virtual bool init(unsigned int device_id, unsigned int sample_rate, unsigned int chunk_size, unsigned int num_channels, AudioCallback callback_func) = 0;
 
 	void setCallback(AudioCallback callback_func);
 
-	void play();
+	void start();
 	void stop();
-	void togglePlay();
+	void toggleActive();
 
-	bool isPlaying() const;
+	bool isActive() const;
 	
-
-protected:
-	virtual void updateDesc() override;
 };
+
+
+/////////////
+//Audio OUTPUT device --> Sends sounds to speakers
+/////////////
+class AudioOutDevice : public AudioDevice
+{
+protected:
+	static int audioCallback(void *out_buffer, void *in_buffer, unsigned int buffer_size, double stream_time, RtAudioStreamStatus status, void *p_device);
+
+public:
+	AudioOutDevice();
+	AudioOutDevice(unsigned int device_id, unsigned int sample_rate, unsigned int chunk_size, unsigned int num_channels, AudioCallback callback_func);
+	virtual ~AudioOutDevice();
+
+	virtual bool init(unsigned int device_id, unsigned int sample_rate, unsigned int chunk_size, unsigned int num_channels, AudioCallback callback_func) override;
+};
+
+
+/////////////
+//Audio INPUT device --> Gets sound from microphones
+/////////////
+class AudioInDevice : public AudioDevice
+{
+protected:
+	static int audioCallback(void *out_buffer, void *in_buffer, unsigned int buffer_size, double stream_time, RtAudioStreamStatus status, void *p_device);
+
+public:
+	AudioInDevice();
+	AudioInDevice(unsigned int device_id, unsigned int sample_rate, unsigned int chunk_size, unsigned int num_channels, AudioCallback callback_func);
+	virtual ~AudioInDevice();
+
+	virtual bool init(unsigned int device_id, unsigned int sample_rate, unsigned int chunk_size, unsigned int num_channels, AudioCallback callback_func);
+};
+
+
 
 
 

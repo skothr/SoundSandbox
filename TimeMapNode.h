@@ -1,6 +1,7 @@
 #ifndef APOLLO_TIME_MAP_NODE_H
 #define APOLLO_TIME_MAP_NODE_H
 
+/*
 #include "Node.h"
 #include "Cursor.h"
 
@@ -43,8 +44,8 @@ private:
 	c_time						maxBufferLength = 0;
 
 public:
-	TimeMapNode(int sample_rate);
-	TimeMapNode(const TimeMapNDesc &tmn_desc);
+	TimeMapNode(NodeGraph *parent_graph, int sample_rate);
+	//TimeMapNode(const TimeMapNDesc &tmn_desc);
 	virtual ~TimeMapNode() = default;
 	
 	//Connector ids
@@ -78,17 +79,17 @@ public:
 	//virtual bool canPush() override;
 	//virtual bool canFlush() override;
 
-	virtual bool flushData(FlushPacket &info) override;
+	//virtual bool flushData(FlushPacket &info) override;
 
-	virtual bool pullData(PullPacket &output, NCID this_id) override;
-	virtual bool pushData(PushPacket &input, NCID this_id) override;
+	virtual bool pullData(PullPacket &output, NCID this_id, NCID other_id) override;
+	virtual bool pushData(PushPacket &input, NCID this_id, NCID other_id) override;
 	
 protected:
-	virtual void updateDesc() override;
+	//virtual void updateDesc() override;
 
 	friend class TimeMapDisplay;
 };
-
+*/
 
 
 

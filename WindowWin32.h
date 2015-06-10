@@ -42,11 +42,12 @@ struct WindowClass
 class WindowWin32
 {
 private:
+	static GlContext	*context;
+
 	static std::vector<WindowClass*> classes;
 	static bool classNameFree(std::wstring class_name);
 	static WindowClass* getClass(WindowStyle &style);
 
-	
 	static void updateKeyStates();
 	static void updateMouseStates();
 
@@ -54,11 +55,14 @@ private:
 
 	WindowClass			*windowClass = nullptr;
 	DWORD				windowStyle;
-	GlContext			*context = nullptr;
 	
-	ResizeCallback		resizeFunc = nullptr;
+	//ResizeCallback		resizeFunc = nullptr;
+
+	WindowWin32			*parentWindow = nullptr;
+	std::vector<WindowWin32*> children;
 
 	WindowHandle		m_handle = nullptr;
+	HDC					m_hdc = nullptr;
 	HCURSOR				m_cursor = nullptr;
 	HICON				m_icon = nullptr;
 	bool				m_keyRepeatEnabled = true;
@@ -67,13 +71,14 @@ private:
 	//UINT16			m_surrogate;
 	bool				m_mouseInside = false;
 
-
-	bool				inFocus = true;
+	bool				inFocus = false;
 
 	std::vector<Event>	events;
 
 	static LRESULT CALLBACK gEventCallback(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
-	void processEvent(UINT msg, WPARAM wParam, LPARAM lParam);
+
+	//Returns whether the given event should continue to propogate to Windows
+	LRESULT processEvent(WindowHandle hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 	void pushEvent(Event e);
 	Event popEvent();
@@ -82,17 +87,20 @@ private:
 
 public:
 	//TODO: replace visible variable with style visibility
-	WindowWin32(Window *owner_, Vec2i size, std::string title, WindowStyle &style);
+	WindowWin32(Window *owner_, WindowWin32 *parent_window, Vec2i size, std::string title, WindowStyle &style);
 	virtual ~WindowWin32();
 	
 	static WindowClass* createWindowClass(WindowStyle &style, std::string class_name = "");
-	static void cleanUp();
+	static void cleanup();
 
 	Vec2i getSize();
 	Point2i getPosition();
 	Point2i getClientPosition();
 
 	Point2i getClientMousePos();
+
+	WindowHandle getHandle() const;
+	HDC getHDC() const;
 
 	void setSize(Vec2i size);
 	void setPosition(Point2i pos);
@@ -103,14 +111,17 @@ public:
 	void setFocus(bool in_focus);
 	bool isInFocus();
 
-	void setResizeFunction(ResizeCallback resize_func);
-	void swapBuffers();
+	GlContext* getContext();
+
+	//void setResizeFunction(ResizeCallback resize_func);
+	void swapBuffers(HDC window);
 
 	bool checkEvent(Event &e);
 
 	void close();
 
 	friend class Window;
+	friend class ContextWindow;
 };
 
 

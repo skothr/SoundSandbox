@@ -75,7 +75,7 @@ public:
 
 	virtual void onScroll(APoint m_pos, AVec d_scroll, bool direct) override;
 	
-	virtual void update(double dt) override;
+	virtual void update(const Time &dt) override;
 	virtual void draw(GlInterface &gl) override;
 };
 
